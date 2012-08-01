@@ -1,0 +1,10 @@
+Package: tiff
+Version: 0.1-0
+Title: Read and write TIFF images
+Author: Simon Urbanek <Simon.Urbanek@r-project.org>
+Maintainer: Simon Urbanek <Simon.Urbanek@r-project.org>
+Depends: R (>= 2.9.0)
+Description: This package provides an easy and simple way to read, write and display bitmap images stored in the TIFF format. It can read and write both files and in-memory raw vectors.
+License: GPL-2 | GPL-3
+SystemRequirements: libtiff
+URL: http://www.rforge.net/tiff/
