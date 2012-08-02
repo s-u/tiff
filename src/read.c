@@ -1,102 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <tiff.h>
-#include <tiffio.h>
+
+#include "common.h"
 
 #include <Rinternals.h>
-/* for R_RGB / R_RGBA */
-#include <R_ext/GraphicsEngine.h>
-
-typedef struct read_job {
-    FILE *f;
-    int ptr, len;
-    char *data;
-} read_job_t;
-
-static tsize_t TIFFReadProc_(thandle_t usr, tdata_t buf, tsize_t length) {
-    read_job_t *rj = (read_job_t*) usr;
-    tsize_t to_read = length;
-    if (rj->f)
-	return fread(buf, 1, to_read, rj->f);
-    if (to_read > (rj->len - rj->ptr))
-	to_read = (rj->len - rj->ptr);
-    if (to_read > 0) {
-	memcpy(buf, rj->data + rj->ptr, to_read);
-	rj->ptr += to_read;
-    }
-    return to_read;
-}
-
-static tsize_t TIFFWriteProc_(thandle_t usr, tdata_t buf, tsize_t length) {
-    Rf_error("TIFFWriteProc called in readTIFF");
-    return -1;
-}
-
-static toff_t  TIFFSeekProc_(thandle_t usr, toff_t offset, int whence) {
-    read_job_t *rj = (read_job_t*) usr;
-    if (rj->f) {
-	int e = fseeko(rj->f, offset, whence);
-	if (e != 0) {
-	    Rf_warning("fseek failed on a file in TIFFSeekProc");
-	    return -1;
-	}
-	return ftello(rj->f);
-    }
-    if (whence == SEEK_CUR)
-	offset += rj->ptr;
-    else if (whence == SEEK_END)
-	offset += rj->len;
-    else if (whence != SEEK_SET) {
-	Rf_warning("invalid `whence' argument to TIFFSeekProc callback called by libtiff");
-	return -1;
-    }
-    if (offset < 0 || offset > rj->len) {
-	Rf_warning("libtiff attempted to seek beyond the data end");
-	return -1;
-    }
-    return (toff_t) (rj->ptr = offset);
-}
-
-static int     TIFFCloseProc_(thandle_t usr) {
-    read_job_t *rj = (read_job_t*) usr;
-    if (rj->f)
-	fclose(rj->f);
-    return 0;
-}
-
-static toff_t  TIFFSizeProc_(thandle_t usr) {
-    read_job_t *rj = (read_job_t*) usr;
-    if (rj->f) {
-	off_t cur = ftello(rj->f), end;
-	fseek(rj->f, 0, SEEK_END);
-	end = ftello(rj->f);
-	fseeko(rj->f, cur, SEEK_SET);
-	return end;
-    }
-    return (toff_t) rj->len;
-}
-
-static int     TIFFMapFileProc_(thandle_t usr, tdata_t* map, toff_t* off) {
-    Rf_warning("libtiff attempted to use TIFFMapFileProc on non-file which is unsupported");
-    return -1;
-}
-
-static void    TIFFUnmapFileProc_(thandle_t usr, tdata_t map, toff_t off) {
-    Rf_warning("libtiff attempted to use TIFFUnmapFileProc on non-file which is unsupported");
-}
-
-static TIFF *TIFF_Open(const char *mode, read_job_t *rj) {
-    TIFF *tiff = TIFFClientOpen("dummy", mode, (thandle_t) rj, TIFFReadProc_, TIFFWriteProc_, TIFFSeekProc_,
-				TIFFCloseProc_, TIFFSizeProc_, TIFFMapFileProc_, TIFFUnmapFileProc_);
-    return tiff;
-}
 
 SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert) {
     SEXP res = R_NilValue, multi_res = R_NilValue, multi_tail = R_NilValue, dim;
     const char *fn;
     int native = asInteger(sNative), all = (asInteger(sAll) == 1), n_img = 0, convert = (asInteger(sConvert) == 1);
-    read_job_t rj;
+    tiff_job_t rj;
     TIFF *tiff;
     FILE *f;
     
