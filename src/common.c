@@ -49,13 +49,39 @@ static tsize_t TIFFReadProc_(thandle_t usr, tdata_t buf, tsize_t length) {
     return to_read;
 }
 
+/* FIXME: check whether we need seeking for TIFF output - if we do, we're in trouble and should use simply resizing */
 static tsize_t TIFFWriteProc_(thandle_t usr, tdata_t buf, tsize_t length) {
-    Rf_error("TIFFWriteProc called in readTIFF");
-    return -1;
+    tiff_job_t *rj = (tiff_job_t*) usr;
+    tsize_t to_write = length, total = length;
+    char *data = (char*) buf;
+    if (rj->f)
+	return (tsize_t) fwrite(buf, 1, length, rj->f);
+    while (length) { /* use iteration instead of recursion */
+        if (to_write > (rj->len - rj->ptr))
+            to_write = (rj->len - rj->ptr);
+        if (to_write > 0) {
+            memcpy(rj->data + rj->ptr, data, to_write);
+            rj->ptr += to_write;
+            length -= to_write;
+            data += to_write;
+            rj->rvlen += to_write;
+        }
+        if (length) { /* more to go -- need next buffer */
+            SEXP rv = allocVector(RAWSXP, INIT_SIZE);
+            SETCDR((SEXP)rj->rvtail, CONS(rv, R_NilValue));
+            rj->rvtail = CDR((SEXP)rj->rvtail);
+            rj->len = LENGTH(rv);
+            rj->data = (char*) RAW(rv);
+            rj->ptr = 0;
+            to_write = length;
+        }
+    }
+    return total;
 }
 
 static toff_t  TIFFSeekProc_(thandle_t usr, toff_t offset, int whence) {
     tiff_job_t *rj = (tiff_job_t*) usr;
+    Rprintf("TIFFSeekProc(%d, %d) [%d]\n", offset, whence, (rj->f) ? ftello(rj->f) : -1);
     if (rj->f) {
 	int e = fseeko(rj->f, offset, whence);
 	if (e != 0) {
