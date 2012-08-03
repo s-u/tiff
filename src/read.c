@@ -6,10 +6,134 @@
 
 #include <Rinternals.h>
 
-SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert) {
+/* avoid protection issues with setAttrib where new symbols may trigger GC probelms */
+static void setAttr(SEXP x, const char *name, SEXP val) {
+    PROTECT(val);
+    setAttrib(x, Rf_install(name), val);
+    UNPROTECT(1);
+}
+
+/* add information attributes accorsing to the TIGG tags.
+   Only a somewhat randome set (albeit mostly baseline) is supported */
+static void TIFF_add_info(TIFF *tiff, SEXP res) {
+    uint32 i32;
+    uint16 i16;
+    float f;
+    char *c = 0;
+
+    if (TIFFGetField(tiff, TIFFTAG_IMAGEDEPTH, &i32))
+	setAttr(res, "depth", ScalarInteger(i32));
+    if (TIFFGetField(tiff, TIFFTAG_BITSPERSAMPLE, &i16))
+	setAttr(res, "bits.per.sample", ScalarInteger(i16));
+    if (TIFFGetField(tiff, TIFFTAG_SAMPLESPERPIXEL, &i16))
+	setAttr(res, "samples.per.pixel", ScalarInteger(i16));
+    if (TIFFGetField(tiff, TIFFTAG_SAMPLEFORMAT, &i16)) {
+	char uv[24];
+	const char *name = 0;
+	switch (i16) {
+	case 1: name = "uint"; break;
+	case 2: name = "int"; break;
+	case 3: name = "float"; break;
+	case 4: name = "undefined"; break;
+	case 5: name = "complex int"; break;
+	case 6: name = "complex float"; break;
+	default:
+	    snprintf(uv, sizeof(uv), "unknown (%d)", i16);
+	    name = uv;
+	}
+	setAttr(res, "sample.format", mkString(name));
+	
+    }
+    if (TIFFGetField(tiff, TIFFTAG_PLANARCONFIG, &i16)) {
+	if (i16 == PLANARCONFIG_CONTIG)
+	    setAttr(res, "planar.config", mkString("contiguous"));
+	else if (i16 == PLANARCONFIG_SEPARATE)
+	    setAttr(res, "planar.config", mkString("separate"));
+	else {
+	    char uv[24];
+	    snprintf(uv, sizeof(uv), "unknown (%d)", i16);
+	    setAttr(res, "planar.config", mkString(uv));
+	}
+    }
+    if (TIFFGetField(tiff, TIFFTAG_COMPRESSION, &i16)) {
+	char uv[24];
+	const char *name = 0;
+	switch (i16) {
+	case 1: name = "none"; break;
+	case 2: name = "CCITT RLE"; break;
+	case 32773: name = "PackBits"; break;
+	case 3: name = "CCITT Group 3 fax"; break;
+	case 4: name = "CCITT Group 4 fax"; break;
+	case 5: name = "LZW"; break;
+	case 6: name = "old JPEG"; break;
+	case 7: name = "JPEG"; break;
+	case 8: name = "deflate"; break;
+	case 9: name = "JBIG b/w"; break;
+	case 10: name = "JBIG color"; break;
+	default:
+	    snprintf(uv, sizeof(uv), "unknown (%d)", i16);
+	    name = uv;
+	}
+	setAttr(res, "compression", mkString(name));
+    }
+    if (TIFFGetField(tiff, TIFFTAG_THRESHHOLDING, &i16))
+	setAttr(res, "threshholding", ScalarInteger(i16));
+    if (TIFFGetField(tiff, TIFFTAG_XRESOLUTION, &f))
+	setAttr(res, "x.resolution", ScalarReal(f));
+    if (TIFFGetField(tiff, TIFFTAG_YRESOLUTION, &f))
+	setAttr(res, "y.resolution", ScalarReal(f));
+    if (TIFFGetField(tiff, TIFFTAG_RESOLUTIONUNIT, &i16)) {
+	const char *name = "unknown";
+	switch (i16) {
+	case 1: name = "none"; break;
+	case 2: name = "inch"; break;
+	case 3: name = "cm"; break;
+	}	    
+	setAttr(res, "resolution.unit", mkString(name));
+    }
+#ifdef TIFFTAG_INDEXED /* very recent in libtiff even though it's an old tag */
+    if (TIFFGetField(tiff, TIFFTAG_INDEXED, &i16))
+	setAttr(res, "indexed", ScalarLogical(i16));
+#endif
+    if (TIFFGetField(tiff, TIFFTAG_COPYRIGHT, &c) && c)
+	setAttr(res, "copyright", mkString(c));
+    if (TIFFGetField(tiff, TIFFTAG_ARTIST, &c) && c)
+	setAttr(res, "artist", mkString(c));
+    if (TIFFGetField(tiff, TIFFTAG_DOCUMENTNAME, &c) && c)
+	setAttr(res, "document.name", mkString(c));
+    if (TIFFGetField(tiff, TIFFTAG_DATETIME, &c) && c)
+	setAttr(res, "date.time", mkString(c));
+    if (TIFFGetField(tiff, TIFFTAG_IMAGEDESCRIPTION, &c) && c)
+	setAttr(res, "description", mkString(c));
+    if (TIFFGetField(tiff, TIFFTAG_SOFTWARE, &c) && c)
+	setAttr(res, "software", mkString(c));
+    if (TIFFGetField(tiff, TIFFTAG_PHOTOMETRIC, &i16)) {
+	char uv[24];
+	const char *name = 0;
+	switch (i16) {
+	case 0: name = "white is zero"; break;
+	case 1: name = "black is zero"; break;
+	case 2: name = "RGB"; break;
+	case 3: name = "palette"; break;
+	case 4: name = "mask"; break;
+	case 5: name = "separated"; break;
+	case 6: name = "YCbCr"; break;
+	case 8: name = "CIELAB"; break;
+	case 9: name = "ICCLab"; break;
+	case 10: name = "ITULab"; break;
+	default:
+	    snprintf(uv, sizeof(uv), "unknown (%d)", i16);
+	    name = uv;
+	}
+	setAttr(res, "color.space", mkString(name));
+    }
+}
+    
+SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo) {
     SEXP res = R_NilValue, multi_res = R_NilValue, multi_tail = R_NilValue, dim;
     const char *fn;
-    int native = asInteger(sNative), all = (asInteger(sAll) == 1), n_img = 0, convert = (asInteger(sConvert) == 1);
+    int native = asInteger(sNative), all = (asInteger(sAll) == 1), n_img = 0,
+	convert = (asInteger(sConvert) == 1), add_info = (asInteger(sInfo) == 1);
     tiff_job_t rj;
     TIFF *tiff;
     FILE *f;
@@ -35,9 +159,11 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert) {
 	uint32 imageWidth = 0, imageLength = 0, imageDepth;
 	uint32 tileWidth, tileLength;
 	uint32 x, y;
-	uint16 config, bps = 8, spp = 1;
+	uint16 config, bps = 8, spp = 1, sformat = 1, out_spp;
 	tdata_t buf;
 	double *ra;
+	uint16 *colormap[3] = {0, 0, 0};
+	int is_float = 0;
 
 	TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &imageWidth);
 	TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &imageLength);
@@ -49,7 +175,14 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert) {
 	TIFFGetField(tiff, TIFFTAG_PLANARCONFIG, &config);
 	TIFFGetField(tiff, TIFFTAG_BITSPERSAMPLE, &bps);
 	TIFFGetField(tiff, TIFFTAG_SAMPLESPERPIXEL, &spp);
-	Rprintf("image %d x %d x %d, tiles %d x %d, bps = %d, spp = %d, config = %d\n", imageWidth, imageLength, imageDepth, tileWidth, tileLength, bps, spp, config);
+	out_spp = spp;
+	TIFFGetField(tiff, TIFFTAG_COLORMAP, colormap, colormap + 1, colormap + 2);
+	if (TIFFGetField(tiff, TIFFTAG_SAMPLEFORMAT, &sformat) && sformat == SAMPLEFORMAT_IEEEFP) is_float = 1;
+	if (spp == 1) { /* modify out_spp for colormaps */
+	    if (colormap[2]) out_spp = 3;
+	    else if (colormap[1]) out_spp = 2;
+	}
+	Rprintf("image %d x %d x %d, tiles %d x %d, bps = %d, spp = %d (output %d), config = %d, colormap = %s\n", imageWidth, imageLength, imageDepth, tileWidth, tileLength, bps, spp, out_spp, config, colormap[0] ? "yes" : "no");
 	
 	if (native || convert) {
 	    /* use built-in RGBA conversion - fortunately, libtiff uses exactly
@@ -57,11 +190,10 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert) {
 	    SEXP tmp = R_NilValue;
 	    /* FIXME: TIFF handle leak in case this fails */
 	    if (convert)
-		PROTECT(tmp = allocVector(REALSXP, imageWidth * imageLength * spp));
+		PROTECT(tmp = allocVector(REALSXP, imageWidth * imageLength * out_spp));
 	    res = allocVector(INTSXP, imageWidth * imageLength);
 
 	    TIFFReadRGBAImage(tiff, imageWidth, imageLength, (uint32*) INTEGER(res), 0);
-	    if (!all) TIFFClose(tiff);
 	    PROTECT(res);
 	    /* TIFF uses flipped y-axis, so we need to invert it .. argh ... */
 	    if (imageLength > 1) {
@@ -82,25 +214,27 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert) {
 		ra = REAL(tmp);
 		for (x = 0; x < imageWidth; x++)
 		    for (y = 0; y < imageLength; y++) {
-			if (spp == 1) { /* single plane (gray) just take R */
+			if (out_spp == 1) { /* single plane (gray) just take R */
 			    ra[imageLength * x + y] = ((double)(data[x + y * imageWidth] & 255)) / 255.0;
-			} else if (spp == 2 /* G+A */) { /* this is a bit odd as we need to copy R and A */
+			} else if (out_spp == 2 /* G+A */) { /* this is a bit odd as we need to copy R and A */
 			    ra[imageLength * x + y] = ((double)(data[x + y * imageWidth] & 255)) / 255.0;
 			    ra[imageWidth * imageLength + imageLength * x + y] = ((double)((data[x + y * imageWidth] >> 16) & 255)) / 255.0;
 			} else /* 3-4 are simply sequential copies */
-			    for (s = 0; s < spp; s++)
+			    for (s = 0; s < out_spp; s++)
 				ra[(imageLength * imageWidth * s) +
 				   imageLength * x + y] =
 				    ((double) ((data[x + y * imageWidth] >> (s * 8)) & 255)) / 255.0;
 		    }
 		UNPROTECT(1); /* res */
 		res = tmp;
-		dim = allocVector(INTSXP, (spp > 1) ? 3 : 2);
+		dim = allocVector(INTSXP, (out_spp > 1) ? 3 : 2);
 		INTEGER(dim)[0] = imageLength;
 		INTEGER(dim)[1] = imageWidth;
-		if (spp > 1)
-		    INTEGER(dim)[2] = spp;
+		if (out_spp > 1)
+		    INTEGER(dim)[2] = out_spp;
 		setAttrib(res, R_DimSymbol, dim);
+		if (add_info)
+		    TIFF_add_info(tiff, res);
 		UNPROTECT(1);
 	    } else {
 		dim = allocVector(INTSXP, 2);
@@ -108,11 +242,15 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert) {
 		INTEGER(dim)[1] = imageWidth;
 		setAttrib(res, R_DimSymbol, dim);
 		setAttrib(res, R_ClassSymbol, mkString("nativeRaster"));
-		setAttrib(res, install("channels"), ScalarInteger(spp));
+		setAttrib(res, install("channels"), ScalarInteger(out_spp));
+		if (add_info)
+		    TIFF_add_info(tiff, res);
 		UNPROTECT(1);
 	    }
-	    if (!all)
+	    if (!all) {
+		TIFFClose(tiff);
 		return res;
+	    }
 	    n_img++;
 	    if (multi_res == R_NilValue) {
 		multi_tail = multi_res = CONS(res, R_NilValue);
@@ -132,8 +270,11 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert) {
 	    Rf_error("image has %d bits/sample which is unsupported in direct mode - use native=TRUE or convert=TRUE", bps);
 	}
 
+	if (sformat == SAMPLEFORMAT_INT)
+	    Rf_warning("tiff package currently only supports unsigned integer or float sample formats in direct mode, but the image contains signed integer format - it will be treated as unsigned (use native=TRUE or convert=TRUE to avoid this issue)");
+
 	/* FIXME: TIFF handle leak in case this fails */
-	res = allocVector(REALSXP, imageWidth * imageLength * spp);
+	res = allocVector(REALSXP, imageWidth * imageLength * out_spp);
 	ra = REAL(res);
 	
 	if (tileWidth == 0) {
@@ -141,10 +282,52 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert) {
 	    tsize_t plane_offset = 0;
 	    x = 0; y = 0; 
 	    buf = _TIFFmalloc(TIFFStripSize(tiff));
+#if TIFF_DEBUG
 	    Rprintf(" - %d x %d strips\n", TIFFNumberOfStrips(tiff), TIFFStripSize(tiff));
+#endif
 	    for (strip = 0; strip < TIFFNumberOfStrips(tiff); strip++) {
 		tsize_t n = TIFFReadEncodedStrip(tiff, strip, buf, (tsize_t) -1);
-		if (config == PLANARCONFIG_CONTIG) { /* interlaced */
+		if (spp == 1) { /* config doesn't matter for spp == 1 */
+		    if (colormap[0]) {
+			tsize_t i, step = bps / 8;
+			for (i = 0; i < n; i += step) {
+			    unsigned int ci = 0;
+			    const unsigned char *v = (const unsigned char*) buf + i;
+			    if (bps == 8) ci = v[0];
+			    else if (bps == 16) ci = ((const unsigned short int*)v)[0];
+			    else if (bps == 32) ci = ((const unsigned int*)v)[0];
+			    ra[imageLength * x + y] = ((double)colormap[0][ci]) / 65535.0; /* color maps are always 16-bit */
+			    if (colormap[1]) {
+				ra[(imageLength * imageWidth) + imageLength * x + y] = ((double)colormap[1][ci]) / 65535.0;
+				if (colormap[2]) 
+				    ra[(2 * imageLength * imageWidth) + imageLength * x + y] = ((double)colormap[2][ci]) / 65535.0;
+			    }
+			    x++;
+			    if (x >= imageWidth) {
+				x -= imageWidth;
+				y++;
+			    }
+			}
+		    } else { /* direct gray */
+			tsize_t i, step = bps / 8;
+			for (i = 0; i < n; i += step) {
+			    double val = NA_REAL;
+			    const unsigned char *v = (const unsigned char*) buf + i;
+			    if (bps == 8) val = ((double) v[0]) / 255.0;
+			    else if (bps == 16) val = ((double) ((const unsigned short int*)v)[0]) / 65535.0;
+			    else if (bps == 32) {
+				if (is_float) val = (double) ((const float*)v)[0];
+				else val = ((double) ((const unsigned int*)v)[0]) / 4294967296.0;
+			    }
+			    ra[imageLength * x + y] = val;
+			    x++;
+			    if (x >= imageWidth) {
+				x -= imageWidth;
+				y++;
+			    }
+			}
+		    }
+		} else if (config == PLANARCONFIG_CONTIG) { /* interlaced */
 		    tsize_t i, j, step = spp * bps / 8;
 		    for (i = 0; i < n; i += step) {
 			const unsigned char *v = (const unsigned char*) buf + i;
@@ -154,9 +337,12 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert) {
 			} else if (bps == 16) {
 			    for (j = 0; j < spp; j++)
 				ra[(imageLength * imageWidth * j) + imageLength * x + y] = ((double) ((const unsigned short int*)v)[j]) / 65535.0;
-			} else if (bps == 32) {
+			} else if (bps == 32 && !is_float) {
 			    for (j = 0; j < spp; j++)
 				ra[(imageLength * imageWidth * j) + imageLength * x + y] = ((double) ((const unsigned int*)v)[j]) / 4294967296.0;
+			} else if (bps == 32 && is_float) {
+			    for (j = 0; j < spp; j++)
+				ra[(imageLength * imageWidth * j) + imageLength * x + y] = (double) ((const float*)v)[j];
 			}
 			x++;
 			if (x >= imageWidth) {
@@ -172,8 +358,10 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert) {
 			    ra[plane_offset + imageLength * x + y] = ((double) v[0]) / 255.0;
 			else if (bps == 16) 
 			    ra[plane_offset + imageLength * x + y] = ((double) ((const unsigned short int*)v)[0]) / 65535.0;
-			else if (bps == 32)
+			else if (bps == 32 && !is_float)
 			    ra[plane_offset + imageLength * x + y] = ((double) ((const unsigned int*)v)[0]) / 4294967296.0;
+			else if (bps == 32 && is_float)
+			    ra[plane_offset + imageLength * x + y] = (double) ((const float*)v)[0];
 		    }
 		    x++;
 		    if (x >= imageWidth) {
@@ -187,7 +375,7 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert) {
 		}
 	    }
 	} else {
-	    Rf_error("tile-based images are currently supported on with native=TRUE or convert=TRUE");
+	    Rf_error("tile-based images are currently supported only with native=TRUE or convert=TRUE");
 	    buf = _TIFFmalloc(TIFFTileSize(tiff));
 	    
 	    for (y = 0; y < imageLength; y += tileLength)
@@ -197,19 +385,21 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert) {
 	
 	_TIFFfree(buf);
 
-	if (!all)
-	    TIFFClose(tiff);
 	PROTECT(res);
-	dim = allocVector(INTSXP, (spp > 1) ? 3 : 2);
+	dim = allocVector(INTSXP, (out_spp > 1) ? 3 : 2);
 	INTEGER(dim)[0] = imageLength;
 	INTEGER(dim)[1] = imageWidth;
-	if (spp > 1)
-	    INTEGER(dim)[2] = spp;
+	if (out_spp > 1)
+	    INTEGER(dim)[2] = out_spp;
 	setAttrib(res, R_DimSymbol, dim);
+	if (add_info)
+	    TIFF_add_info(tiff, res);
 	UNPROTECT(1);
 	
-	if (!all)
+	if (!all) {
+	    TIFFClose(tiff);
 	    return res;
+	}
 	n_img++;
 	if (multi_res == R_NilValue) {
 	    multi_tail = multi_res = CONS(res, R_NilValue);

@@ -7,7 +7,8 @@ Read a bitmap image stored in the TIFF format
 Reads an image from a TIFF file/content into a raster array.
 }
 \usage{
-readTIFF(source, native = FALSE, all = FALSE, convert = FALSE)
+readTIFF(source, native = FALSE, all = FALSE, convert = FALSE,
+         info = FALSE)
 }
 \arguments{
   \item{source}{Either name of the file to read from or a raw vector
@@ -20,20 +21,22 @@ readTIFF(source, native = FALSE, all = FALSE, convert = FALSE)
   image is returned.}
 \item{convert}{first convert the image into 8-bit RGBA samples and then
   to an array, see below for details.}
+\item{info}{if set to \code{TRUE} then the resulting image(s) will also
+  contain information from TIFF tags as attributes}
 }
-%\details{
-%}
 \value{
 If \code{native} is \code{FALSE} then an array of the dimensions height
 x width x channels. If there is only one channel the result is a
-matrix. The values are reals between 0 and 1. If \code{native} is
+matrix. The values are reals between 0 and 1 (except for 32-bit floating
+point sample storage which are reals as-is). If \code{native} is
 \code{TRUE} then an object of the class \code{nativeRaster} is
 returned instead. The latter cannot be easily computed on but is the
 most efficient way to draw using \code{rasterImage}.
 
 If \code{all} is \code{TRUE} then the result is a list of the above with
-one or more elements.
-
+one or more elements..
+}
+\details{
 Most common files decompress into RGB (3 channels), RGBA (4 channels),
 Grayscale (1 channel) or GA (2 channels). Note that G and GA images
 cannot be directly used in \code{\link{rasterImage}} unless
@@ -42,12 +45,14 @@ RGB or RGBA format (\code{nativeRaster} is always 8-bit RGBA).
 
 TIFF images can have a wide range of internal representations, but only
 the most common in image processing are directly supported (8-bit, 16-bit
-and 32-bit samples). Other formats (color maps, sub-8-bit images, etc.)
-are only supported via \code{convert=TRUE} which uses the built-in
-facilities of the TIFF library to convert the image into RGBA format
-with 8-bit samples (i.e. total of 32-bit per pixel) and then store the
-relevant components from there into real arrays. This is the same path
-as used by \code{native=TRUE} and so differs only in the output value.
+integer and 32-bit float samples). Other formats (color maps, sub-8-bit
+images, etc.) are only supported via \code{convert=TRUE} which uses the
+built-in facilities of the TIFF library to convert the image into RGBA
+format with 8-bit samples (i.e. total of 32-bit per pixel) and then
+store the relevant components from there into real arrays. This is the
+same path as used by \code{native=TRUE} and so differs only in the
+output value. Note that conversion may result in different values than
+direct acccess as it is intended mainly for viewing and not computation.
 }
 %\references{
 %}
@@ -55,7 +60,6 @@ as used by \code{native=TRUE} and so differs only in the output value.
 %}
 %\note{
 %}
-
 \seealso{
 \code{\link{rasterImage}}, \code{\link{writeTIFF}}
 }
