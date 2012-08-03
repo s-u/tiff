@@ -141,7 +141,7 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo) {
     if (TYPEOF(sFn) == RAWSXP) {
 	rj.data = (char*) RAW(sFn);
 	rj.len = LENGTH(sFn);
-	rj.ptr = 0;
+	rj.alloc = rj.ptr = 0;
 	rj.f = f = 0;
     } else {
 	if (TYPEOF(sFn) != STRSXP || LENGTH(sFn) < 1) Rf_error("invalid filename");

@@ -7,15 +7,10 @@
 
 typedef struct tiff_job {
     FILE *f;
-    int ptr, len;
+    long ptr, len, alloc;
     char *data;
-    void *rvlist, *rvtail;
-    int rvlen;
 } tiff_job_t;
 
 TIFF *TIFF_Open(const char *mode, tiff_job_t *rj);
-
-/* default size of a raw vector chunk when collecting the image result */
-#define INIT_SIZE (1024*256)
 
 #endif

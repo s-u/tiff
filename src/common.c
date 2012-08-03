@@ -49,39 +49,36 @@ static tsize_t TIFFReadProc_(thandle_t usr, tdata_t buf, tsize_t length) {
     return to_read;
 }
 
-/* FIXME: check whether we need seeking for TIFF output - if we do, we're in trouble and should use simply resizing */
+static int guarantee_write_buffer(tiff_job_t *rj, long where) {
+    if (where > rj->alloc) { /* need to resize buffer? */
+	void *new_data;
+	unsigned long new_alloc = rj->alloc;
+	while (new_alloc <= where)
+	    new_alloc <<= 1;
+	new_data = realloc(rj->data, new_alloc);
+	if (!new_data) /* FAILED */
+	    return 0;
+	rj->data = new_data;
+	rj->alloc = new_alloc;
+    }
+    return 1;
+}
+
 static tsize_t TIFFWriteProc_(thandle_t usr, tdata_t buf, tsize_t length) {
     tiff_job_t *rj = (tiff_job_t*) usr;
-    tsize_t to_write = length, total = length;
-    char *data = (char*) buf;
     if (rj->f)
 	return (tsize_t) fwrite(buf, 1, length, rj->f);
-    while (length) { /* use iteration instead of recursion */
-        if (to_write > (rj->len - rj->ptr))
-            to_write = (rj->len - rj->ptr);
-        if (to_write > 0) {
-            memcpy(rj->data + rj->ptr, data, to_write);
-            rj->ptr += to_write;
-            length -= to_write;
-            data += to_write;
-            rj->rvlen += to_write;
-        }
-        if (length) { /* more to go -- need next buffer */
-            SEXP rv = allocVector(RAWSXP, INIT_SIZE);
-            SETCDR((SEXP)rj->rvtail, CONS(rv, R_NilValue));
-            rj->rvtail = CDR((SEXP)rj->rvtail);
-            rj->len = LENGTH(rv);
-            rj->data = (char*) RAW(rv);
-            rj->ptr = 0;
-            to_write = length;
-        }
-    }
-    return total;
+    if (!guarantee_write_buffer(rj, rj->ptr + length))
+	return 0;
+    memcpy(rj->data + rj->ptr, buf, length);
+    rj->ptr += length;
+    if (rj->ptr > rj->len)
+	rj->len = rj->ptr;
+    return length;
 }
 
 static toff_t  TIFFSeekProc_(thandle_t usr, toff_t offset, int whence) {
     tiff_job_t *rj = (tiff_job_t*) usr;
-    Rprintf("TIFFSeekProc(%d, %d) [%d]\n", offset, whence, (rj->f) ? ftello(rj->f) : -1);
     if (rj->f) {
 	int e = fseeko(rj->f, offset, whence);
 	if (e != 0) {
@@ -98,9 +95,16 @@ static toff_t  TIFFSeekProc_(thandle_t usr, toff_t offset, int whence) {
 	Rf_warning("invalid `whence' argument to TIFFSeekProc callback called by libtiff");
 	return -1;
     }
+    if (rj->alloc && offset >= rj->alloc && !guarantee_write_buffer(rj, offset))
+	return -1;
     if (offset < 0 || offset > rj->len) {
 	Rf_warning("libtiff attempted to seek beyond the data end");
 	return -1;
+    }
+    rj->ptr = offset;
+    if (rj->ptr > rj->len) {
+	memset(rj->data + rj->len, 0, rj->ptr - rj->len);
+	rj->len = rj->ptr;
     }
     return (toff_t) (rj->ptr = offset);
 }
@@ -109,6 +113,11 @@ static int     TIFFCloseProc_(thandle_t usr) {
     tiff_job_t *rj = (tiff_job_t*) usr;
     if (rj->f)
 	fclose(rj->f);
+    else if (rj->alloc) {
+	free(rj->data);
+	rj->data = 0;
+	rj->alloc = 0;
+    }
     last_tiff = 0;
     return 0;
 }
