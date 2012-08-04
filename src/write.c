@@ -5,15 +5,34 @@
 #include "common.h"
 
 #include <Rinternals.h>
+#include <Rversion.h>
 
 #define INIT_SIZE (256 * 1024)
 
-SEXP write_tiff(SEXP image, SEXP where, SEXP sBPS, SEXP sCompr) {
+#define HAS_ALPHA 0x01
+#define IS_GRAY   0x02
+#define IS_RGB    0x04
+/* if neither GRAY/RGB is set then it's B/W */
+
+int analyze_native(const unsigned int *what, int length) {
+    int alpha = 0, ac = 0, i;
+    for (i = 0; i < length; i++) {
+	if (!alpha && (what[i] & 0xff000000) != 0xff000000) alpha = 1;
+	if (ac < 2 && ((what[i] & 0xff) != ((what[i] >> 8) & 0xff) || (what[i] & 0xff) != ((what[i] >> 16) & 0xff))) ac = 2;
+	if (ac == 0 && (what[i] & 0xffffff) != 0xffffff && (what[i] & 0xffffff)) ac = 1;
+	if (ac == 2 && alpha) break; /* no need to continue */
+    }
+    return alpha | (ac << 1);
+}
+
+SEXP write_tiff(SEXP image, SEXP where, SEXP sBPS, SEXP sCompr, SEXP sReduce) {
     SEXP dims, img_list = 0;
     tiff_job_t rj;
     TIFF *tiff;
     FILE *f;
-    int native = 0, raw_array = 0, bps = asInteger(sBPS), compression = asInteger(sCompr), img_index = 0, n_img = 1;
+    int native = 0, raw_array = 0, bps = asInteger(sBPS), compression = asInteger(sCompr),
+	reduce = asInteger(sReduce),
+	img_index = 0, n_img = 1;
     uint32 width, height, planes = 1;
 
     if (TYPEOF(image) == VECSXP) {
@@ -99,13 +118,64 @@ SEXP write_tiff(SEXP image, SEXP where, SEXP sBPS, SEXP sCompr) {
 	TIFFSetField(tiff, TIFFTAG_IMAGEWIDTH, width);
 	TIFFSetField(tiff, TIFFTAG_IMAGELENGTH, height);
 	TIFFSetField(tiff, TIFFTAG_PLANARCONFIG, 1);
+	TIFFSetField(tiff, TIFFTAG_SOFTWARE, "tiff package, R " R_MAJOR "." R_MINOR);
 	if (native) {
 	    TIFFSetField(tiff, TIFFTAG_BITSPERSAMPLE, 8);
-	    TIFFSetField(tiff, TIFFTAG_SAMPLESPERPIXEL, 4);
-	    TIFFSetField(tiff, TIFFTAG_ROWSPERSTRIP, height);
-	    TIFFSetField(tiff, TIFFTAG_COMPRESSION, compression);
-	    TIFFSetField(tiff, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
-	    TIFFWriteEncodedStrip(tiff, 0, INTEGER(image), width * height * 4);
+	    if (reduce) {
+		int an = analyze_native((const unsigned int*) INTEGER(image), width * height);
+		if (an == (HAS_ALPHA | IS_RGB))
+		    reduce = 0;
+		else { /* we only reduce to RGB, GA or G */
+		    int out_spp = ((an & HAS_ALPHA) ? 1 : 0 ) + ((an & IS_RGB) ? 3 : 1);
+		    uint32 i = 1, n = width * height;
+		    tdata_t buf;
+		    unsigned char *data8;
+		    const unsigned int *nd = (const unsigned int*) INTEGER(image);
+		    TIFFSetField(tiff, TIFFTAG_SAMPLESPERPIXEL, out_spp);
+		    TIFFSetField(tiff, TIFFTAG_ROWSPERSTRIP, height);
+		    TIFFSetField(tiff, TIFFTAG_COMPRESSION, compression);
+		    TIFFSetField(tiff, TIFFTAG_PHOTOMETRIC, (out_spp > 2) ? PHOTOMETRIC_RGB : PHOTOMETRIC_MINISBLACK);
+		    buf = _TIFFmalloc(width * height * out_spp);
+		    data8 = (unsigned char*) buf;
+		    if (out_spp == 1)
+			for (i = 0; i < n; i++) /* G */
+			    data8[i] = nd[i] & 255;
+		    else if (out_spp == 2) {
+			if (((const char*)&i)[0] == 1) /* little-endian */
+			    for (i = 0; i < n; i++) { /* GA */
+				*(data8++) = nd[i] & 255;
+				*(data8++) = (nd[i] >> 24) & 255;
+			    }
+			else /* big-endian */
+			    for (i = 0; i < n; i++) { /* GA */
+				*(data8++) = (nd[i] >> 24) & 255;
+				*(data8++) = nd[i] & 255;
+			    }
+		    } else if (out_spp == 3) {
+			if (((const char*)&i)[0] == 1) /* little-endian */
+			    for (i = 0; i < n; i++) { /* RGB */
+				*(data8++) = nd[i] & 255;
+				*(data8++) = (nd[i] >> 8) & 255;
+				*(data8++) = (nd[i] >> 16) & 255;
+			    }
+			else /* big-endian */
+			    for (i = 0; i < n; i++) { /* RGB */
+				*(data8++) = (nd[i] >> 16) & 255;
+				*(data8++) = (nd[i] >> 8) & 255;
+				*(data8++) = nd[i] & 255;
+			    }
+		    }
+		    TIFFWriteEncodedStrip(tiff, 0, buf, width * height * out_spp);
+		    _TIFFfree(buf);
+		}
+	    }
+	    if (!reduce) {
+		TIFFSetField(tiff, TIFFTAG_SAMPLESPERPIXEL, 4);
+		TIFFSetField(tiff, TIFFTAG_ROWSPERSTRIP, height);
+		TIFFSetField(tiff, TIFFTAG_COMPRESSION, compression);
+		TIFFSetField(tiff, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
+		TIFFWriteEncodedStrip(tiff, 0, INTEGER(image), width * height * 4);
+	    }
 	} else {
 	    uint32 x, y, pl;
 	    tdata_t buf;
@@ -146,7 +216,12 @@ SEXP write_tiff(SEXP image, SEXP where, SEXP sBPS, SEXP sCompr) {
 	    TIFFWriteDirectory(tiff);
     }
     if (!rj.f) {
-	SEXP res = allocVector(RAWSXP, rj.len);
+	SEXP res;
+	TIFFFlush(tiff);
+	res = allocVector(RAWSXP, rj.len);
+#if TIFF_DEBUG
+	Rprintf("convert to raw %d bytes (ptr=%d, alloc=%d)\n", rj.len, rj.ptr, rj.alloc);
+#endif
 	memcpy(RAW(res), rj.data, rj.len);
 	TIFFClose(tiff);
 	return res;

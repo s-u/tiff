@@ -40,6 +40,9 @@ static tsize_t TIFFReadProc_(thandle_t usr, tdata_t buf, tsize_t length) {
     tsize_t to_read = length;
     if (rj->f)
 	return fread(buf, 1, to_read, rj->f);
+#if TIFF_DEBUG
+    Rprintf("read [@%d %d/%d] -> %d\n", rj->ptr, rj->len, rj->alloc, length);
+#endif
     if (to_read > (rj->len - rj->ptr))
 	to_read = (rj->len - rj->ptr);
     if (to_read > 0) {
@@ -68,6 +71,9 @@ static tsize_t TIFFWriteProc_(thandle_t usr, tdata_t buf, tsize_t length) {
     tiff_job_t *rj = (tiff_job_t*) usr;
     if (rj->f)
 	return (tsize_t) fwrite(buf, 1, length, rj->f);
+#if TIFF_DEBUG
+    Rprintf("write [@%d %d/%d] <- %d\n", rj->ptr, rj->len, rj->alloc, length);
+#endif
     if (!guarantee_write_buffer(rj, rj->ptr + length))
 	return 0;
     memcpy(rj->data + rj->ptr, buf, length);
@@ -87,6 +93,9 @@ static toff_t  TIFFSeekProc_(thandle_t usr, toff_t offset, int whence) {
 	}
 	return ftello(rj->f);
     }
+#if TIFF_DEBUG
+    Rprintf("seek [@%d %d/%d]  %d (%d)\n", rj->ptr, rj->len, rj->alloc, offset, whence);
+#endif
     if (whence == SEEK_CUR)
 	offset += rj->ptr;
     else if (whence == SEEK_END)
@@ -95,16 +104,17 @@ static toff_t  TIFFSeekProc_(thandle_t usr, toff_t offset, int whence) {
 	Rf_warning("invalid `whence' argument to TIFFSeekProc callback called by libtiff");
 	return -1;
     }
-    if (rj->alloc && offset >= rj->alloc && !guarantee_write_buffer(rj, offset))
-	return -1;
+    if (rj->alloc && rj->len < offset) {
+	if (offset >= rj->alloc) { /* need more space? */
+	    if (!guarantee_write_buffer(rj, offset))
+		return -1;
+	} else /* enough space but need to zero out */
+	    memset(rj->data + rj->len, 0, offset - rj->len);
+	rj->len = offset;
+    }
     if (offset < 0 || offset > rj->len) {
 	Rf_warning("libtiff attempted to seek beyond the data end");
 	return -1;
-    }
-    rj->ptr = offset;
-    if (rj->ptr > rj->len) {
-	memset(rj->data + rj->len, 0, rj->ptr - rj->len);
-	rj->len = rj->ptr;
     }
     return (toff_t) (rj->ptr = offset);
 }
