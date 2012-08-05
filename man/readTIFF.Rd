@@ -8,7 +8,7 @@ Reads an image from a TIFF file/content into a raster array.
 }
 \usage{
 readTIFF(source, native = FALSE, all = FALSE, convert = FALSE,
-         info = FALSE)
+         info = FALSE, indexed = FALSE)
 }
 \arguments{
   \item{source}{Either name of the file to read from or a raw vector
@@ -23,6 +23,12 @@ readTIFF(source, native = FALSE, all = FALSE, convert = FALSE,
   to an array, see below for details.}
 \item{info}{if set to \code{TRUE} then the resulting image(s) will also
   contain information from TIFF tags as attributes}
+\item{indexed}{if set to \code{TRUE} then indexed images will be
+  returned in the indexed form, i.e., as a matrix of integer indices
+  referencing into a color map which is returned in the
+  \code{"color.map"} attribute. This flag cannot be combined with
+  \code{convert} or \code{native} and has no effect on images that are
+  not indexed.}
 }
 \value{
 If \code{native} is \code{FALSE} then an array of the dimensions height

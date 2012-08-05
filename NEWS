@@ -1,5 +1,9 @@
 NEWS/Changelog
 
+0.1-1	(under development)
+    o	add readTIFF(..., indexed=TRUE) which return indexed images as
+	color map and an index matrix.
+
 0.1-0	2012-08-04
     o	first CRAN release
 

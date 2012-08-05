@@ -95,6 +95,20 @@ static void TIFF_add_info(TIFF *tiff, SEXP res) {
     if (TIFFGetField(tiff, TIFFTAG_INDEXED, &i16))
 	setAttr(res, "indexed", ScalarLogical(i16));
 #endif
+    if (TIFFGetField(tiff, TIFFTAG_ORIENTATION, &i16)) {
+	const char *name = "<invalid>";
+	switch (i16) {
+	case 1: name = "top.left"; break;
+	case 2: name = "top.right"; break;
+	case 3: name = "bottom.right"; break;
+	case 4: name = "bottom.left"; break;
+	case 5: name = "left.top"; break;
+	case 6: name = "right.top"; break;
+	case 7: name = "right.bottom"; break;
+	case 8: name = "left.bottom"; break;
+	}
+	setAttr(res, "orientation", mkString(name));
+    }
     if (TIFFGetField(tiff, TIFFTAG_COPYRIGHT, &c) && c)
 	setAttr(res, "copyright", mkString(c));
     if (TIFFGetField(tiff, TIFFTAG_ARTIST, &c) && c)
@@ -129,14 +143,18 @@ static void TIFF_add_info(TIFF *tiff, SEXP res) {
     }
 }
     
-SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo) {
+SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEXP sIndexed) {
     SEXP res = R_NilValue, multi_res = R_NilValue, multi_tail = R_NilValue, dim;
     const char *fn;
     int native = asInteger(sNative), all = (asInteger(sAll) == 1), n_img = 0,
-	convert = (asInteger(sConvert) == 1), add_info = (asInteger(sInfo) == 1);
+	convert = (asInteger(sConvert) == 1), add_info = (asInteger(sInfo) == 1),
+	indexed = (asInteger(sIndexed) == 1);
     tiff_job_t rj;
     TIFF *tiff;
     FILE *f;
+
+    if (indexed && (convert || native))
+	Rf_error("indexed and native/convert cannot both be TRUE as they are mutually exclusive");
     
     if (TYPEOF(sFn) == RAWSXP) {
 	rj.data = (char*) RAW(sFn);
@@ -178,7 +196,7 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo) {
 	out_spp = spp;
 	TIFFGetField(tiff, TIFFTAG_COLORMAP, colormap, colormap + 1, colormap + 2);
 	if (TIFFGetField(tiff, TIFFTAG_SAMPLEFORMAT, &sformat) && sformat == SAMPLEFORMAT_IEEEFP) is_float = 1;
-	if (spp == 1) { /* modify out_spp for colormaps */
+	if (spp == 1 && !indexed) { /* modify out_spp for colormaps */
 	    if (colormap[2]) out_spp = 3;
 	    else if (colormap[1]) out_spp = 2;
 	}
@@ -274,8 +292,8 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo) {
 	    Rf_warning("tiff package currently only supports unsigned integer or float sample formats in direct mode, but the image contains signed integer format - it will be treated as unsigned (use native=TRUE or convert=TRUE to avoid this issue)");
 
 	/* FIXME: TIFF handle leak in case this fails */
-	res = allocVector(REALSXP, imageWidth * imageLength * out_spp);
-	ra = REAL(res);
+	res = allocVector((spp == 1 && indexed && colormap[0]) ? INTSXP : REALSXP, imageWidth * imageLength * out_spp);
+	if (!(spp == 1 && indexed && colormap[0])) ra = REAL(res);
 	
 	if (tileWidth == 0) {
 	    tstrip_t strip;
@@ -288,7 +306,7 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo) {
 	    for (strip = 0; strip < TIFFNumberOfStrips(tiff); strip++) {
 		tsize_t n = TIFFReadEncodedStrip(tiff, strip, buf, (tsize_t) -1);
 		if (spp == 1) { /* config doesn't matter for spp == 1 */
-		    if (colormap[0]) {
+		    if (colormap[0] && !indexed) {
 			tsize_t i, step = bps / 8;
 			for (i = 0; i < n; i += step) {
 			    unsigned int ci = 0;
@@ -302,6 +320,22 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo) {
 				if (colormap[2]) 
 				    ra[(2 * imageLength * imageWidth) + imageLength * x + y] = ((double)colormap[2][ci]) / 65535.0;
 			    }
+			    x++;
+			    if (x >= imageWidth) {
+				x -= imageWidth;
+				y++;
+			    }
+			}
+		    } else if (colormap[0]) { /* indexed requested */
+			tsize_t i, step = bps / 8;
+			int *ia = INTEGER(res);
+			for (i = 0; i < n; i += step) {
+			    int val = NA_INTEGER;
+			    const unsigned char *v = (const unsigned char*) buf + i;
+			    if (bps == 8) val = 1 + v[0];
+			    else if (bps == 16) val = 1 + ((const unsigned short int*)v)[0];
+			    else if (bps == 32) val = 1 + ((const unsigned int*)v)[0];
+			    ia[imageLength * x + y] = val;
 			    x++;
 			    if (x >= imageWidth) {
 				x -= imageWidth;
@@ -392,6 +426,17 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo) {
 	if (out_spp > 1)
 	    INTEGER(dim)[2] = out_spp;
 	setAttrib(res, R_DimSymbol, dim);
+	if (colormap[0] && TYPEOF(res) == INTSXP && indexed) {
+	    int nc = 1 << bps, i;
+	    SEXP cm = allocMatrix(REALSXP, 3, nc);
+	    double *d = REAL(cm);
+	    for (i = 0; i < nc; i++) {
+		d[3 * i] = ((double) colormap[0][i]) / 65535.0;
+		d[3 * i + 1] = ((double) colormap[1][i]) / 65535.0;
+		d[3 * i + 2] = ((double) colormap[2][i]) / 65535.0;
+	    }
+	    setAttr(res, "color.map", cm);
+	}
 	if (add_info)
 	    TIFF_add_info(tiff, res);
 	UNPROTECT(1);
