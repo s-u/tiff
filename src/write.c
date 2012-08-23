@@ -57,7 +57,7 @@ SEXP write_tiff(SEXP image, SEXP where, SEXP sBPS, SEXP sCompr, SEXP sReduce) {
 	const char *fn;
 	if (TYPEOF(where) != STRSXP || LENGTH(where) < 1) Rf_error("invalid filename");
 	fn = CHAR(STRING_ELT(where, 0));
-	f = fopen(fn, "wb");
+	f = fopen(fn, "w+b");
 	if (!f) Rf_error("unable to create %s", fn);
 	rj.f = f;
     }
@@ -210,10 +210,9 @@ SEXP write_tiff(SEXP image, SEXP where, SEXP sBPS, SEXP sCompr, SEXP sReduce) {
 	    _TIFFfree(buf);
 	}
 
-	if (!img_list)
-	    break;
-	else if (img_index < n_img)
+	if (img_list && img_index < n_img)
 	    TIFFWriteDirectory(tiff);
+	else break;
     }
     if (!rj.f) {
 	SEXP res;

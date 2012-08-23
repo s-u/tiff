@@ -16,7 +16,12 @@ static void TIFFWarningHandler_(const char* module, const char* fmt, va_list ap)
     Rf_warning("%s: %s", module, txtbuf);
 }
 
+static int err_reenter = 0;
+
 static void TIFFErrorHandler_(const char* module, const char* fmt, va_list ap) {
+    if (err_reenter) return; /* prevent re-entrance which can happen as TIFF is happy to call another error from Close */
+    err_reenter = 1;
+    /* FIXME: if TIFFClose below fails we may get stuck without errors!! */
     /* we can't pass it directly since R has no vprintf entry point */
     vsnprintf(txtbuf, sizeof(txtbuf), fmt, ap);
     /* we have to close the TIFF that caused it as it will not
@@ -24,6 +29,7 @@ static void TIFFErrorHandler_(const char* module, const char* fmt, va_list ap) {
        but that is hopefully unlikely/impossible */
     if (last_tiff)
 	TIFFClose(last_tiff); /* this will also reset last_tiff */
+    err_reenter = 0;
     Rf_error("%s: %s", module, txtbuf);
 }
 
