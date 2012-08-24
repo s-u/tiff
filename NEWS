@@ -1,6 +1,6 @@
 NEWS/Changelog
 
-0.1-1	(under development)
+0.1-1	2012-08-24
     o	add readTIFF(..., indexed=TRUE) which return indexed images as
 	color map and an index matrix.
 
