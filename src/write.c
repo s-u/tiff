@@ -205,7 +205,7 @@ SEXP write_tiff(SEXP image, SEXP where, SEXP sBPS, SEXP sCompr, SEXP sReduce) {
 		for (y = 0; y < height; y++)
 		    for (x = 0; x < width; x++)
 			for (pl = 0; pl < planes; pl++)
-			    data16[(x + y * width) * planes + pl] = (unsigned char) (ra[y + x * height + pl * width * height] * 65535.0);
+			    data16[(x + y * width) * planes + pl] = (unsigned short) (ra[y + x * height + pl * width * height] * 65535.0);
 	    TIFFWriteEncodedStrip(tiff, 0, buf, width * height * planes * (bps / 8));
 	    _TIFFfree(buf);
 	}
