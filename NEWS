@@ -1,6 +1,6 @@
 NEWS/Changelog
 
-0.1-2	(under development)
+0.1-2	2012-08-30
     o	fixed a bug in writeTIFF() for 16-bit images
 
 
