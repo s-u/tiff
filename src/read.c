@@ -143,12 +143,12 @@ static void TIFF_add_info(TIFF *tiff, SEXP res) {
     }
 }
     
-SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEXP sIndexed) {
+SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEXP sIndexed, SEXP sOriginal) {
     SEXP res = R_NilValue, multi_res = R_NilValue, multi_tail = R_NilValue, dim;
     const char *fn;
     int native = asInteger(sNative), all = (asInteger(sAll) == 1), n_img = 0,
 	convert = (asInteger(sConvert) == 1), add_info = (asInteger(sInfo) == 1),
-	indexed = (asInteger(sIndexed) == 1);
+	indexed = (asInteger(sIndexed) == 1), original = (asInteger(sOriginal) == 1);
     tiff_job_t rj;
     TIFF *tiff;
     FILE *f;
@@ -283,7 +283,7 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 	    continue;
 	}
 	
-	if (bps != 8 && bps != 16 && bps != 32) {
+	if (bps != 8 && bps != 16 && bps != 32 && ( bps != 12 || spp != 1 )) {
 	    TIFFClose(tiff);
 	    Rf_error("image has %d bits/sample which is unsupported in direct mode - use native=TRUE or convert=TRUE", bps);
 	}
@@ -292,9 +292,12 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 	    Rf_warning("tiff package currently only supports unsigned integer or float sample formats in direct mode, but the image contains signed integer format - it will be treated as unsigned (use native=TRUE or convert=TRUE to avoid this issue)");
 
 	/* FIXME: TIFF handle leak in case this fails */
-	res = allocVector((spp == 1 && indexed && colormap[0]) ? INTSXP : REALSXP, imageWidth * imageLength * out_spp);
-	if (!(spp == 1 && indexed && colormap[0])) ra = REAL(res);
+	res = allocVector((spp == 1 && (original || (indexed && colormap[0]))) ? INTSXP : REALSXP, imageWidth * imageLength * out_spp);
+	if (!(spp == 1 && (original || (indexed && colormap[0])))) ra = REAL(res);
 	
+#define DE12A(v) ((((unsigned int) v[0]) << 4) | (((unsigned int) v[1]) >> 4))
+#define DE12B(v) (((((unsigned int) v[1]) & 0x0f) << 8) | ((unsigned int) v[2]))
+
 	if (tileWidth == 0) {
 	    tstrip_t strip;
 	    tsize_t plane_offset = 0;
@@ -308,17 +311,37 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 		if (spp == 1) { /* config doesn't matter for spp == 1 */
 		    if (colormap[0] && !indexed) {
 			tsize_t i, step = bps / 8;
+			int *ia = original ? INTEGER(res) : 0;
+			if (bps == 12) step += 2;
 			for (i = 0; i < n; i += step) {
-			    unsigned int ci = 0;
+			  unsigned int ci = 0, ci2;
 			    const unsigned char *v = (const unsigned char*) buf + i;
 			    if (bps == 8) ci = v[0];
 			    else if (bps == 16) ci = ((const unsigned short int*)v)[0];
 			    else if (bps == 32) ci = ((const unsigned int*)v)[0];
-			    ra[imageLength * x + y] = ((double)colormap[0][ci]) / 65535.0; /* color maps are always 16-bit */
-			    if (colormap[1]) {
-				ra[(imageLength * imageWidth) + imageLength * x + y] = ((double)colormap[1][ci]) / 65535.0;
-				if (colormap[2]) 
-				    ra[(2 * imageLength * imageWidth) + imageLength * x + y] = ((double)colormap[2][ci]) / 65535.0;
+			    else if (bps == 12) {
+				ci  = DE12A(v);
+				ci2 = DE12B(v);
+			    }
+			    if (original) {
+				ia[imageLength * x + y] = colormap[0][ci]; /* color maps are always 16-bit */
+				/* FIXME: bps==12 is broken with color map lookup !!! */
+				if (bps == 12)
+				    ia[imageLength * ++x + y] = colormap[0][ci2];
+				if (colormap[1]) {
+				    ia[(imageLength * imageWidth) + imageLength * x + y] = colormap[1][ci];
+				    if (colormap[2]) 
+					ia[(2 * imageLength * imageWidth) + imageLength * x + y] = colormap[2][ci];
+				}
+			    } else {
+				ra[imageLength * x + y] = ((double)colormap[0][ci]) / 65535.0; /* color maps are always 16-bit */
+				if (bps == 12)
+				    ra[imageLength * ++x + y] = ((double)colormap[0][ci2]) / 65535.0;
+				if (colormap[1]) {
+				    ra[(imageLength * imageWidth) + imageLength * x + y] = ((double)colormap[1][ci]) / 65535.0;
+				    if (colormap[2]) 
+					ra[(2 * imageLength * imageWidth) + imageLength * x + y] = ((double)colormap[2][ci]) / 65535.0;
+				}
 			    }
 			    x++;
 			    if (x >= imageWidth) {
@@ -326,17 +349,21 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 				y++;
 			    }
 			}
-		    } else if (colormap[0]) { /* indexed requested */
+		    } else if (colormap[0] || original) { /* indexed requested */
 			tsize_t i, step = bps / 8;
 			int *ia = INTEGER(res);
+			if (bps == 12) step = 3;
 			for (i = 0; i < n; i += step) {
 			    int val = NA_INTEGER;
 			    const unsigned char *v = (const unsigned char*) buf + i;
 			    if (bps == 8) val = 1 + v[0];
 			    else if (bps == 16) val = 1 + ((const unsigned short int*)v)[0];
 			    else if (bps == 32) val = 1 + ((const unsigned int*)v)[0];
-			    ia[imageLength * x + y] = val;
-			    x++;
+			    else if (bps == 12) {
+				ia[imageLength * x++ + y] = DE12A(v);
+				val = DE12B(v);
+			    }
+			    ia[imageLength * x++ + y] = val;
 			    if (x >= imageWidth) {
 				x -= imageWidth;
 				y++;
@@ -344,6 +371,7 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 			}
 		    } else { /* direct gray */
 			tsize_t i, step = bps / 8;
+			if (bps == 12) step = 3;
 			for (i = 0; i < n; i += step) {
 			    double val = NA_REAL;
 			    const unsigned char *v = (const unsigned char*) buf + i;
@@ -352,6 +380,10 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 			    else if (bps == 32) {
 				if (is_float) val = (double) ((const float*)v)[0];
 				else val = ((double) ((const unsigned int*)v)[0]) / 4294967296.0;
+			    }
+			    if (bps == 12) {
+				ra[imageLength * x++ + y] = ((double) DE12A(v)) / 4096.0;
+				val = ((double) DE12B(v)) / 4096.0;
 			    }
 			    ra[imageLength * x + y] = val;
 			    x++;

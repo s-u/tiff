@@ -8,7 +8,7 @@ Reads an image from a TIFF file/content into a raster array.
 }
 \usage{
 readTIFF(source, native = FALSE, all = FALSE, convert = FALSE,
-         info = FALSE, indexed = FALSE)
+         info = FALSE, indexed = FALSE, as.is = FALSE)
 }
 \arguments{
   \item{source}{Either name of the file to read from or a raw vector
@@ -29,12 +29,15 @@ readTIFF(source, native = FALSE, all = FALSE, convert = FALSE,
   \code{"color.map"} attribute. This flag cannot be combined with
   \code{convert} or \code{native} and has no effect on images that are
   not indexed.}
+\item{as.is}{attempt to return original values without re-scaling
+  where possible}
 }
 \value{
 If \code{native} is \code{FALSE} then an array of the dimensions height
 x width x channels. If there is only one channel the result is a
 matrix. The values are reals between 0 and 1 (except for 32-bit floating
-point sample storage which are reals as-is). If \code{native} is
+point sample storage which are unscaled reals, and for indexed and
+\code{as.is=TRUE} which are integers). If \code{native} is
 \code{TRUE} then an object of the class \code{nativeRaster} is
 returned instead. The latter cannot be easily computed on but is the
 most efficient way to draw using \code{rasterImage}.
@@ -64,8 +67,16 @@ direct acccess as it is intended mainly for viewing and not computation.
 %}
 %\author{
 %}
-%\note{
-%}
+\note{
+  Some non-standard formats such as 12-bit TIFFs are partially supported
+  (there is no standard for packing order for TIFFs beoynd 8-bit so we
+  assume big-endian packing similar to the default fill order and only
+  support single channel or indexed).
+
+  The \code{as.is=TRUE} option is experimental, cannot be used with
+  \code{native} or \code{convert} and only works for integer storage
+  TIFFs.
+}
 \seealso{
 \code{\link{rasterImage}}, \code{\link{writeTIFF}}
 }
