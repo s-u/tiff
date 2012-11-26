@@ -1,5 +1,9 @@
 NEWS/Changelog
 
+0.1-4	(under development)
+    o	remove debugging output (it is now only shown if tiff
+	is compiled with -DTIFF_DEBUG=1)
+
 0.1-3	2012-11-05
     o	add support for 12-bit grayscale TIFF images in readTIFF()
 	(Note that 12-bit TIFFs are outside of the standard, so

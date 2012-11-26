@@ -200,7 +200,9 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 	    if (colormap[2]) out_spp = 3;
 	    else if (colormap[1]) out_spp = 2;
 	}
+#if TIFF_DEBUG
 	Rprintf("image %d x %d x %d, tiles %d x %d, bps = %d, spp = %d (output %d), config = %d, colormap = %s\n", imageWidth, imageLength, imageDepth, tileWidth, tileLength, bps, spp, out_spp, config, colormap[0] ? "yes" : "no");
+#endif
 	
 	if (native || convert) {
 	    /* use built-in RGBA conversion - fortunately, libtiff uses exactly
