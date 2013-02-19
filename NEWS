@@ -1,6 +1,6 @@
 NEWS/Changelog
 
-0.1-4	(under development)
+0.1-4	2013-02-19
     o	remove debugging output (it is now only shown if tiff
 	is compiled with -DTIFF_DEBUG=1)
 
