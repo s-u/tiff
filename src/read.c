@@ -290,8 +290,8 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 	    Rf_error("image has %d bits/sample which is unsupported in direct mode - use native=TRUE or convert=TRUE", bps);
 	}
 
-	if (sformat == SAMPLEFORMAT_INT)
-	    Rf_warning("tiff package currently only supports unsigned integer or float sample formats in direct mode, but the image contains signed integer format - it will be treated as unsigned (use native=TRUE or convert=TRUE to avoid this issue)");
+	if (sformat == SAMPLEFORMAT_INT && !original)
+	    Rf_warning("tiff package currently only supports unsigned integer or float sample formats in direct mode, but the image contains signed integer format - it will be treated as unsigned (use as.is=TRUE, native=TRUE or convert=TRUE depending on your intent)");
 
 	/* FIXME: TIFF handle leak in case this fails */
 	res = allocVector((spp == 1 && (original || (indexed && colormap[0]))) ? INTSXP : REALSXP, imageWidth * imageLength * out_spp);
@@ -353,17 +353,17 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 			}
 		    } else if (colormap[0] || original) { /* indexed requested */
 			tsize_t i, step = bps / 8;
-			int *ia = INTEGER(res);
+			int *ia = INTEGER(res), ix_base = original ? 0 : 1;
 			if (bps == 12) step = 3;
 			for (i = 0; i < n; i += step) {
 			    int val = NA_INTEGER;
 			    const unsigned char *v = (const unsigned char*) buf + i;
-			    if (bps == 8) val = 1 + v[0];
-			    else if (bps == 16) val = 1 + ((const unsigned short int*)v)[0];
-			    else if (bps == 32) val = 1 + ((const unsigned int*)v)[0];
+			    if (bps == 8) val = ix_base + v[0];
+			    else if (bps == 16) val = ix_base + ((const unsigned short int*)v)[0];
+			    else if (bps == 32) val = ix_base + ((const unsigned int*)v)[0];
 			    else if (bps == 12) {
-				ia[imageLength * x++ + y] = DE12A(v);
-				val = DE12B(v);
+				ia[imageLength * x++ + y] = ix_base + DE12A(v);
+				val = ix_base + DE12B(v);
 			    }
 			    ia[imageLength * x++ + y] = val;
 			    if (x >= imageWidth) {

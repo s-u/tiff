@@ -1,5 +1,5 @@
 Package: tiff
-Version: 0.1-4
+Version: 0.1-5
 Title: Read and write TIFF images
 Author: Simon Urbanek <Simon.Urbanek@r-project.org>
 Maintainer: Simon Urbanek <Simon.Urbanek@r-project.org>
