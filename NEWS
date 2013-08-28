@@ -5,6 +5,8 @@ NEWS/Changelog
 	values was shifted by one (i.e., stored integer value x
 	was returned as x + 1)
 
+    o	writeTIFF() now supports 32-bit (integer) output
+
 0.1-4	2013-02-19
     o	remove debugging output (it is now only shown if tiff
 	is compiled with -DTIFF_DEBUG=1)
