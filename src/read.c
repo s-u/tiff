@@ -6,15 +6,15 @@
 
 #include <Rinternals.h>
 
-/* avoid protection issues with setAttrib where new symbols may trigger GC probelms */
+/* avoid protection issues with setAttrib where new symbols may trigger GC problems */
 static void setAttr(SEXP x, const char *name, SEXP val) {
     PROTECT(val);
     setAttrib(x, Rf_install(name), val);
     UNPROTECT(1);
 }
 
-/* add information attributes accorsing to the TIGG tags.
-   Only a somewhat randome set (albeit mostly baseline) is supported */
+/* add information attributes according to the TIFF tags.
+   Only a somewhat random set (albeit mostly baseline) is supported */
 static void TIFF_add_info(TIFF *tiff, SEXP res) {
     uint32 i32;
     uint16 i16;
@@ -82,6 +82,10 @@ static void TIFF_add_info(TIFF *tiff, SEXP res) {
 	setAttr(res, "x.resolution", ScalarReal(f));
     if (TIFFGetField(tiff, TIFFTAG_YRESOLUTION, &f))
 	setAttr(res, "y.resolution", ScalarReal(f));
+    if (TIFFGetField(tiff, TIFFTAG_XPOSITION, &f))
+	setAttr(res, "x.position", ScalarReal(f));
+    if (TIFFGetField(tiff, TIFFTAG_YPOSITION, &f))
+	setAttr(res, "y.position", ScalarReal(f));
     if (TIFFGetField(tiff, TIFFTAG_RESOLUTIONUNIT, &i16)) {
 	const char *name = "unknown";
 	switch (i16) {
