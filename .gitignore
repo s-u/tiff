@@ -1,0 +1,11 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+src/*.o
+src/*.so
+src/*.dll
+
+src/win32/
+src/win64/
+src/libtiff-current-win.tar.gz
