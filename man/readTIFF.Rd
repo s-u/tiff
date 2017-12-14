@@ -17,7 +17,7 @@ readTIFF(source, native = FALSE, all = FALSE, convert = FALSE,
   (the default) then the result is an array, if \code{TRUE} then the
   result is a native raster representation (suitable for plotting).}
 \item{all}{TIFF files can contain more than one image, if \code{all =
-    TRUE} then all images are returenin a list, otherwsie only the first
+    TRUE} then all images are returned in a list, otherwise only the first
   image is returned.}
 \item{convert}{first convert the image into 8-bit RGBA samples and then
   to an array, see below for details.}
