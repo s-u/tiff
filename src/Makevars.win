@@ -1,8 +1,8 @@
 ## detect 64-bit Windows
 ifeq "$(WIN)" "64"
-PKG_CFLAGS=-Iwin64
-PKG_LIBS=-Lwin64 -ltiff -ljpeg -lz
+PKG_CFLAGS=-Iinclude
+PKG_LIBS=-Llib/x64 -ltiff -ljpeg -lz
 else
-PKG_CFLAGS=-Iwin32
-PKG_LIBS=-Lwin32 -ltiff -ljpeg -lz
+PKG_CFLAGS=-Iinclude
+PKG_LIBS=-Llib/i386 -ltiff -ljpeg -lz
 endif

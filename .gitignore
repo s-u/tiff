@@ -6,6 +6,6 @@ src/*.o
 src/*.so
 src/*.dll
 
-src/win32/
-src/win64/
-src/libtiff-current-win.tar.gz
+src/include/
+src/lib/
+src/local323.zip

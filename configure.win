@@ -3,24 +3,24 @@
 echo "  checking TIFF headers and libraries"
 allok=yes
 
-if [ ! -e src/win32/libz.a ]; then
-    if [ ! -e src/libtiff-current-win.tar.gz ]; then
+if [ ! -e src/lib/i386/libz.a ]; then
+    if [ ! -e src/local323.zip ]; then
 	echo "  cannot find current TIFF files"
 	echo "  attempting to download them"
-	echo 'download.file("http://www.rforge.net/tiff/files/libtiff-current-win.tar.gz","src/libtiff-current-win.tar.gz",mode="wb",quiet=TRUE)'|${R_HOME}/bin/R --vanilla --slave
+	echo 'download.file("https://www.stats.ox.ac.uk/pub/Rtools/goodies/multilib/local323.zip","src/local323.zip",mode="wb",quiet=TRUE)'|${R_HOME}/bin/R --vanilla --slave
     fi
-    if [ ! -e src/libtiff-current-win.tar.gz ]; then
+    if [ ! -e src/local323.zip ]; then
 	allok=no
     else
 	echo "  unpacking current TIFF"
-	tar fxz src/libtiff-current-win.tar.gz -C src
-        if [ ! -e src/win32/libz.a ]; then
+	unzip src/local323.zip -d src
+        if [ ! -e src/lib/i386/libz.a ]; then
 	    allok=no
 	fi
     fi
 fi
 
-if [ ! -e src/win32/libz.a ]; then
+if [ ! -e src/lib/i386/libz.a ]; then
     allok=no
 fi
 
@@ -28,11 +28,11 @@ if [ ${allok} != yes ]; then
     echo ""
     echo " *** ERROR: unable to find TIFF files"
     echo ""
-    echo " They must be either in src/win32 or in a tar-ball"
-    echo " src/libtiff-current-win.tar.gz"
+    echo " They must be either in src/lib/i386 or in a zip file"
+    echo " src/local323.zip"
     echo ""
-    echo " You can get the latest binary tar ball from"
-    echo " http://www.rforge.net/tiff/files/"
+    echo " You can get the latest binary zip from"
+    echo " https://www.stats.ox.ac.uk/pub/Rtools/goodies/multilib"
     echo ""
     exit 1
 fi
