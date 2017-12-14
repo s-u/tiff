@@ -146,6 +146,70 @@ static void TIFF_add_info(TIFF *tiff, SEXP res) {
 	setAttr(res, "color.space", mkString(name));
     }
 }
+
+SEXP read_tiff_directory(SEXP sFn, SEXP sAll) {
+    SEXP res = R_NilValue, multi_res = R_NilValue, multi_tail = R_NilValue;
+    const char *fn;
+    int all = (asInteger(sAll) == 1), n_img = 0;
+    tiff_job_t rj;
+    TIFF *tiff;
+    FILE *f;
+
+    if (TYPEOF(sFn) == RAWSXP) {
+	rj.data = (char*) RAW(sFn);
+	rj.len = LENGTH(sFn);
+	rj.alloc = rj.ptr = 0;
+	rj.f = f = 0;
+    } else {
+	if (TYPEOF(sFn) != STRSXP || LENGTH(sFn) < 1) Rf_error("invalid filename");
+	fn = CHAR(STRING_ELT(sFn, 0));
+	f = fopen(fn, "rb");
+	if (!f) Rf_error("unable to open %s", fn);
+	rj.f = f;
+    }
+
+    tiff = TIFF_Open("rmc", &rj); /* no mmap, no chopping */
+    if (!tiff)
+	Rf_error("Unable to open TIFF");
+    
+    while (1) { /* loop over separate image in a directory if desired */
+    	PROTECT(res = allocVector(VECSXP, 0));
+	TIFF_add_info(tiff, res);
+	UNPROTECT(1);
+	
+	if (!all) {
+	    TIFFClose(tiff);
+	    return res;
+	}
+	
+	n_img++;
+	if (multi_res == R_NilValue) {
+	    multi_tail = multi_res = CONS(res, R_NilValue);
+	    PROTECT(multi_res);
+	} else {
+	    SEXP q = CONS(res, R_NilValue);
+	    SETCDR(multi_tail, q);
+	    multi_tail = q;
+	}
+	if (!TIFFReadDirectory(tiff))
+	    break;
+    }
+    TIFFClose(tiff);
+    
+    /* convert LISTSXP into VECSXP */
+    PROTECT(res = allocVector(VECSXP, n_img));
+    {
+	int i = 0;
+	while (multi_res != R_NilValue) {
+	    SET_VECTOR_ELT(res, i, CAR(multi_res));
+	    i++;
+	    multi_res = CDR(multi_res);
+	}
+    }
+    UNPROTECT(2);
+    return res;
+}
+
     
 SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEXP sIndexed, SEXP sOriginal) {
     SEXP res = R_NilValue, multi_res = R_NilValue, multi_tail = R_NilValue, dim;

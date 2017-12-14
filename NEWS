@@ -1,5 +1,9 @@
 NEWS/Changelog
 
+0.1-6
+    o   Add readTIFFDirectory() function to read image tags without 
+        reading the actual image.
+        
 0.1-5	2013-09-03
     o	bugfix: output of readTIFF(..., as.is=TRUE) with integer
 	values was shifted by one (i.e., stored integer value x
