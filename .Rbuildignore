@@ -1,2 +1,5 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
+^src/local323.zip$
+^src/lib/
+^src/include/
