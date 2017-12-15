@@ -12,3 +12,4 @@ Description: This package provides an easy and simple way to read, write
 License: GPL-2 | GPL-3
 SystemRequirements: tiff and jpeg libraries
 URL: http://www.rforge.net/tiff/
+Suggests: testthat
