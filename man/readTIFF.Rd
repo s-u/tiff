@@ -16,8 +16,10 @@ readTIFF(source, native = FALSE, all = FALSE, convert = FALSE,
   \item{native}{determines the image representation - if \code{FALSE}
   (the default) then the result is an array, if \code{TRUE} then the
   result is a native raster representation (suitable for plotting).}
-\item{all}{TIFF files can contain more than one image, if \code{all =
-    TRUE} then all images are returned in a list, otherwise only the first
+\item{all}{TIFF files can contain more than one image. If \code{all =
+    TRUE} then all images are returned in a list
+    of images. If \code{all} is a vector, it gives the (1-based) 
+    indices of images to return. Otherwise only the first
   image is returned.}
 \item{convert}{first convert the image into 8-bit RGBA samples and then
   to an array, see below for details.}
@@ -29,7 +31,7 @@ readTIFF(source, native = FALSE, all = FALSE, convert = FALSE,
   \code{"color.map"} attribute. This flag cannot be combined with
   \code{convert} or \code{native} and has no effect on images that are
   not indexed.}
-\item{as.is}{attempt to return original values without re-scaling
+\item{as.is}{attempt to return original integer values without re-scaling
   where possible}
 }
 \value{
@@ -42,8 +44,9 @@ point sample storage which are unscaled reals, and for indexed and
 returned instead. The latter cannot be easily computed on but is the
 most efficient way to draw using \code{rasterImage}.
 
-If \code{all} is \code{TRUE} then the result is a list of the above with
-one or more elements..
+If \code{all} is \code{TRUE} or a vector of image indices,
+then the result is a list of the above with
+zero or more elements..
 }
 \details{
 Most common files decompress into RGB (3 channels), RGBA (4 channels),

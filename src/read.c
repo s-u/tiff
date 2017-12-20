@@ -5,6 +5,7 @@
 #include "common.h"
 
 #include <Rinternals.h>
+#define TIFF_DEBUG 0
 
 /* avoid protection issues with setAttrib where new symbols may trigger GC problems */
 static void setAttr(SEXP x, const char *name, SEXP val) {
@@ -154,7 +155,7 @@ static void TIFF_add_info(TIFF *tiff, SEXP res) {
 SEXP read_tiff_directory(SEXP sFn, SEXP sAll) {
     SEXP res = R_NilValue, multi_res = R_NilValue, multi_tail = R_NilValue;
     const char *fn;
-    int all = (asInteger(sAll) == 1), n_img = 0;
+    int n_img = 0;
     tiff_job_t rj;
     TIFF *tiff;
     FILE *f;
@@ -176,12 +177,29 @@ SEXP read_tiff_directory(SEXP sFn, SEXP sAll) {
     if (!tiff)
 	Rf_error("Unable to open TIFF");
     
+    int cur_dir = 0; /* 1-based image number */
+    int nprot = 0;
     while (1) { /* loop over separate image in a directory if desired */
+	cur_dir++;
+            
+        /* If sAll is a numeric vector, only read images referenced in it */
+        if (!isLogical(sAll)) {
+            SEXP m = PROTECT(match(sAll, ScalarInteger(cur_dir), 0));
+            int cur_dir_in_m = asInteger(m) == 0;
+            UNPROTECT(1);
+            if (cur_dir_in_m) {  /* No match */
+                if (TIFFReadDirectory(tiff))
+                    continue;
+                else
+	            break;
+            }
+        }
+        
     	PROTECT(res = allocVector(VECSXP, 0));
 	TIFF_add_info(tiff, res);
 	UNPROTECT(1);
 	
-	if (!all) {
+	if (isLogical(sAll) && (asInteger(sAll)==0)) {
 	    TIFFClose(tiff);
 	    return res;
 	}
@@ -190,6 +208,7 @@ SEXP read_tiff_directory(SEXP sFn, SEXP sAll) {
 	if (multi_res == R_NilValue) {
 	    multi_tail = multi_res = CONS(res, R_NilValue);
 	    PROTECT(multi_res);
+	    nprot++;
 	} else {
 	    SEXP q = CONS(res, R_NilValue);
 	    SETCDR(multi_tail, q);
@@ -202,6 +221,7 @@ SEXP read_tiff_directory(SEXP sFn, SEXP sAll) {
     
     /* convert LISTSXP into VECSXP */
     PROTECT(res = allocVector(VECSXP, n_img));
+    nprot++;
     {
 	int i = 0;
 	while (multi_res != R_NilValue) {
@@ -210,7 +230,7 @@ SEXP read_tiff_directory(SEXP sFn, SEXP sAll) {
 	    multi_res = CDR(multi_res);
 	}
     }
-    UNPROTECT(2);
+    UNPROTECT(nprot);
     return res;
 }
 
@@ -218,7 +238,7 @@ SEXP read_tiff_directory(SEXP sFn, SEXP sAll) {
 SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEXP sIndexed, SEXP sOriginal) {
     SEXP res = R_NilValue, multi_res = R_NilValue, multi_tail = R_NilValue, dim;
     const char *fn;
-    int native = asInteger(sNative), all = (asInteger(sAll) == 1), n_img = 0,
+    int native = asInteger(sNative), n_img = 0,
 	convert = (asInteger(sConvert) == 1), add_info = (asInteger(sInfo) == 1),
 	indexed = (asInteger(sIndexed) == 1), original = (asInteger(sOriginal) == 1);
     tiff_job_t rj;
@@ -245,13 +265,30 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
     if (!tiff)
 	Rf_error("Unable to open TIFF");
 
+    int cur_dir = 0; /* 1-based image number */
+    int nprot = 0;
     while (1) { /* loop over separate image in a directory if desired */
+	cur_dir++;
+            
+        /* If sAll is a numeric vector, only read images referenced in it */
+        if (!isLogical(sAll)) {
+            SEXP m = PROTECT(match(sAll, ScalarInteger(cur_dir), 0));
+            int cur_dir_in_m = asInteger(m) == 0;
+            UNPROTECT(1);
+            if (cur_dir_in_m) {  /* No match */
+                if (TIFFReadDirectory(tiff))
+                    continue;
+                else
+	            break;
+            }
+        }
+        
 	uint32 imageWidth = 0, imageLength = 0, imageDepth;
 	uint32 tileWidth, tileLength;
 	uint32 x, y;
 	uint16 config, bps = 8, spp = 1, sformat = 1, out_spp;
 	tdata_t buf;
-	double *ra;
+	double *ra = 0;
 	uint16 *colormap[3] = {0, 0, 0};
 	int is_float = 0;
 
@@ -341,7 +378,7 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 		    TIFF_add_info(tiff, res);
 		UNPROTECT(1);
 	    }
-	    if (!all) {
+	    if (isLogical(sAll) && asInteger(sAll) == 0) {
 		TIFFClose(tiff);
 		return res;
 	    }
@@ -395,7 +432,7 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 			int *ia = original ? INTEGER(res) : 0;
 			if (bps == 12) step += 2;
 			for (i = 0; i < n; i += step) {
-			  unsigned int ci = 0, ci2;
+			  unsigned int ci = 0, ci2 = 0;
 			    const unsigned char *v = (const unsigned char*) buf + i;
 			    if (bps == 8) ci = v[0];
 			    else if (bps == 16) ci = ((const unsigned short int*)v)[0];
@@ -614,7 +651,7 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 	    TIFF_add_info(tiff, res);
 	UNPROTECT(1);
 	
-	if (!all) {
+	if (isLogical(sAll) && asInteger(sAll)==0) {
 	    TIFFClose(tiff);
 	    return res;
 	}
@@ -622,6 +659,7 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 	if (multi_res == R_NilValue) {
 	    multi_tail = multi_res = CONS(res, R_NilValue);
 	    PROTECT(multi_res);
+	    nprot++;
 	} else {
 	    SEXP q = CONS(res, R_NilValue);
 	    SETCDR(multi_tail, q);
@@ -633,6 +671,7 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
     TIFFClose(tiff);
     /* convert LISTSXP into VECSXP */
     PROTECT(res = allocVector(VECSXP, n_img));
+    nprot++;
     {
 	int i = 0;
 	while (multi_res != R_NilValue) {
@@ -641,6 +680,6 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 	    multi_res = CDR(multi_res);
 	}
     }
-    UNPROTECT(2);
+    UNPROTECT(nprot);
     return res;
 }

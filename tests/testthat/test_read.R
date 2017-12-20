@@ -28,12 +28,27 @@ check_attributes <- function(attrs) {
 
 test_that("readTIFF works", {
     # Don't duplicate the examples...
-    img <- readTIFF(system.file("img", "Rlogo.tiff", package="tiff"), info=TRUE)
+    path = system.file("img", "Rlogo.tiff", package="tiff")
+    img <- readTIFF(path, info=TRUE)
 
     expect_equal(dim(img), c(76, 100, 4))
-    
     attrs = attributes(img)
     check_attributes(attrs)
+    
+    img <- readTIFF(path, info=TRUE, all=TRUE)
+    expect_equal(length(img), 1)
+    expect_equal(dim(img[[1]]), c(76, 100, 4))
+    attrs = attributes(img[[1]])
+    check_attributes(attrs)
+    
+    img <- readTIFF(path, info=TRUE, all=1)
+    expect_equal(length(img), 1)
+    expect_equal(dim(img[[1]]), c(76, 100, 4))
+    attrs = attributes(img[[1]])
+    check_attributes(attrs)
+    
+    img <- readTIFF(path, info=TRUE, all=2)
+    expect_equal(length(img), 0)
 })
 
 test_that("readTIFFDirectory works", {
@@ -44,4 +59,11 @@ test_that("readTIFFDirectory works", {
     attrs <- readTIFFDirectory(path, all=TRUE)
     expect_equal(length(attrs), 1) # attrs is a list of lists now
     check_attributes(attrs[[1]])
+    
+    attrs <- readTIFFDirectory(path, all=1)
+    expect_equal(length(attrs), 1) # attrs is a list of lists now
+    check_attributes(attrs[[1]])
+    
+    attrs <- readTIFFDirectory(path, all=2)
+    expect_equal(length(attrs), 0) # attrs is an empty now, there is no image 2
 })
