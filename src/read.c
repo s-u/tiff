@@ -273,7 +273,9 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 	    else if (colormap[1]) out_spp = 2;
 	}
 #if TIFF_DEBUG
-	Rprintf("image %d x %d x %d, tiles %d x %d, bps = %d, spp = %d (output %d), config = %d, colormap = %s\n", imageWidth, imageLength, imageDepth, tileWidth, tileLength, bps, spp, out_spp, config, colormap[0] ? "yes" : "no");
+	Rprintf("image %d x %d x %d, tiles %d x %d, bps = %d, spp = %d (output %d), config = %d, colormap = %s,\n", 
+            imageWidth, imageLength, imageDepth, tileWidth, tileLength, bps, spp, out_spp, config, colormap[0] ? "yes" : "no");
+        Rprintf("      float = %d\n", is_float);
 #endif
 	
 	if (native || convert) {
@@ -355,11 +357,16 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 	    if (!TIFFReadDirectory(tiff))
 		break;
 	    continue;
-	}
+	} /* end native || convert */
 	
 	if (bps != 8 && bps != 16 && bps != 32 && ( bps != 12 || spp != 1 )) {
 	    TIFFClose(tiff);
 	    Rf_error("image has %d bits/sample which is unsupported in direct mode - use native=TRUE or convert=TRUE", bps);
+	}
+
+	if (original && is_float) {
+	    TIFFClose(tiff);
+	    Rf_error("as.is=TRUE is not supported for floating point images");
 	}
 
 	if (sformat == SAMPLEFORMAT_INT && !original)
