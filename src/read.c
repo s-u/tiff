@@ -521,13 +521,73 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 		    }
 		}
 	    }
-	} else {
-	    Rf_error("tile-based images are currently supported only with native=TRUE or convert=TRUE");
+	} else { /* tiled image */
+	    if (indexed || colormap[0] || bps == 12)
+	    	Rf_error("Indexed and 12-bit tiled images are not supported.");
+
+	    if (spp > 1 && config != PLANARCONFIG_CONTIG)
+	    	Rf_error("Planar format tiled images are not supported");
+
+#if TIFF_DEBUG
+	    Rprintf(" - %d x %d tiles\n", TIFFNumberOfTiles(tiff), TIFFTileSize(tiff));
+#endif
+	    x = 0; y = 0; 
 	    buf = _TIFFmalloc(TIFFTileSize(tiff));
-	    
-	    for (y = 0; y < imageLength; y += tileLength)
-		for (x = 0; x < imageWidth; x += tileWidth)
-		    TIFFReadTile(tiff, buf, x, y, 0 /*depth*/, 0 /*plane*/);
+
+	    for (y = 0; y < imageLength; y += tileLength) 
+	      for (x = 0; x < imageWidth; x += tileWidth) {
+		tsize_t n = TIFFReadTile(tiff, buf, x, y, 0 /*depth*/, 0 /*plane*/);
+		if (spp == 1) { /* config doesn't matter for spp == 1 */
+		     /* direct gray */
+			tsize_t i, step = bps / 8;
+			uint32 xoff=0, yoff=0;
+			for (i = 0; i < n; i += step) {
+			    double val = NA_REAL;
+			    const unsigned char *v = (const unsigned char*) buf + i;
+			    if (bps == 8) val = ((double) v[0]) / 255.0;
+			    else if (bps == 16) val = ((double) ((const unsigned short int*)v)[0]) / 65535.0;
+			    else if (bps == 32) {
+				if (is_float) val = (double) ((const float*)v)[0];
+				else val = ((double) ((const unsigned int*)v)[0]) / 4294967296.0;
+			    }
+			    if (x + xoff < imageWidth && y + yoff < imageLength)
+			    	ra[imageLength * (x + xoff) + y + yoff] = val;
+			    xoff++;
+			    if (xoff >= tileWidth) {
+				xoff -= tileWidth;
+				yoff++;
+			    }
+			}
+		    
+		} else if (config == PLANARCONFIG_CONTIG) { /* interlaced */
+		    tsize_t i, j, step = spp * bps / 8;
+		    uint32 xoff=0, yoff=0;
+		    for (i = 0; i < n; i += step) {
+			const unsigned char *v = (const unsigned char*) buf + i;
+			if (x + xoff < imageWidth && y + yoff < imageLength) {
+				if (bps == 8) {
+				    for (j = 0; j < spp; j++)
+					ra[(imageLength * imageWidth * j) + imageLength * (x + xoff) + y + yoff] = ((double) v[j]) / 255.0;
+				} else if (bps == 16) {
+				    for (j = 0; j < spp; j++)
+					ra[(imageLength * imageWidth * j) + imageLength * (x + xoff) + y + yoff] = ((double) ((const unsigned short int*)v)[j]) / 65535.0;
+				} else if (bps == 32 && !is_float) {
+				    for (j = 0; j < spp; j++)
+					ra[(imageLength * imageWidth * j) + imageLength * (x + xoff) + y + yoff] = ((double) ((const unsigned int*)v)[j]) / 4294967296.0;
+				} else if (bps == 32 && is_float) {
+				    for (j = 0; j < spp; j++)
+					ra[(imageLength * imageWidth * j) + imageLength * (x + xoff) + y + yoff] = (double) ((const float*)v)[j];
+				}
+			}
+			xoff++;
+			if (xoff >= tileWidth) {
+			    xoff -= tileWidth;
+			    yoff++;
+			}
+		    }
+		}
+	    }
+	
 	}
 	
 	_TIFFfree(buf);
