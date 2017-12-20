@@ -5,6 +5,8 @@ library(testthat)
 # Check the attributes read from Rlogo.tiff
 check_attributes <- function(attrs) {
     expected = list(
+        width = 100,
+        length = 76,
         bits.per.sample = 8L, 
         samples.per.pixel = 4L, 
         sample.format = "uint", 

@@ -21,6 +21,10 @@ static void TIFF_add_info(TIFF *tiff, SEXP res) {
     float f;
     char *c = 0;
 
+    if (TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &i32))
+	setAttr(res, "width", ScalarInteger(i32));
+    if (TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &i32))
+	setAttr(res, "length", ScalarInteger(i32));
     if (TIFFGetField(tiff, TIFFTAG_IMAGEDEPTH, &i32))
 	setAttr(res, "depth", ScalarInteger(i32));
     if (TIFFGetField(tiff, TIFFTAG_BITSPERSAMPLE, &i16))
