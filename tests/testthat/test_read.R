@@ -71,8 +71,8 @@ test_that("readTIFFDirectory works", {
 
 test_that("Reading tiles works", {
     # Some tests that only work on @PKI-Kent's dev box :-/
-    root = rprojroot::find_package_root_file()
-    data_folder = file.path(root, '..', 'tiffData')
+    root = rprojroot::find_testthat_root_file()
+    data_folder = file.path(root, '..', '..', '..', 'tiffData')
     skip_if_not(file.exists(data_folder))
     
     # These files all contain multiple images including tiled images
