@@ -205,15 +205,18 @@ SEXP read_tiff_directory(SEXP sFn, SEXP sAll) {
             }
         }
         
+        /* Read the TIFF directory as attributes of res */
     	PROTECT(res = allocVector(VECSXP, 0));
 	TIFF_add_info(tiff, res);
 	UNPROTECT(1);
 	
+	/* if (sAll is FALSE) */
 	if (isLogical(sAll) && (asInteger(sAll)==0)) {
 	    TIFFClose(tiff);
 	    return res;
 	}
 	
+	/* Build a linked list of results */
 	n_img++;
 	if (multi_res == R_NilValue) {
 	    multi_tail = multi_res = CONS(res, R_NilValue);

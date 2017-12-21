@@ -1,12 +1,25 @@
 NEWS/Changelog
 
 0.1-6
-    o   Add readTIFFDirectory() function to read image tags without 
-        reading the actual image.
-        
     o   Add limited support for tiled images. Supports 8-, 16- and 32-bit
         integer and float images with spp=1 or 3. No support for indexed,
         color map, as.is, or planar format color.
+        
+    o   Add readTIFFDirectory() function to read image tags without 
+        reading the actual image.
+
+    o   Add the ability to read (or get info on) selected images by passing
+        a vector in the `all` parameter.
+        
+    o   Add width, length, x.position, y.position, and, if available,
+        rows.per.strip, tile.width, tile.length to the directory
+        info returned when `info=TRUE` (and by readTIFFDirectory).
+
+    o   Update to libtiff 4.0.6 from the Rtools site.
+    
+    o   Stop with an error if `as.is=TRUE` is used with a float image.
+
+    o   Fixed documentation typos.
         
 0.1-5	2013-09-03
     o	bugfix: output of readTIFF(..., as.is=TRUE) with integer
