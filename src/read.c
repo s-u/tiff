@@ -60,6 +60,16 @@ static void TIFF_add_info(TIFF *tiff, SEXP res) {
 	    setAttr(res, "planar.config", mkString(uv));
 	}
     }
+    
+    if (TIFFGetField(tiff, TIFFTAG_ROWSPERSTRIP, &i32))
+        setAttr(res, "rows.per.strip", ScalarInteger(i32));
+    
+    if (TIFFGetField(tiff, TIFFTAG_TILEWIDTH, &i32)) {
+        setAttr(res, "tile.width", ScalarInteger(i32));
+        TIFFGetField(tiff, TIFFTAG_TILELENGTH, &i32);
+        setAttr(res, "tile.length", ScalarInteger(i32));
+    }
+    
     if (TIFFGetField(tiff, TIFFTAG_COMPRESSION, &i16)) {
 	char uv[24];
 	const char *name = 0;
