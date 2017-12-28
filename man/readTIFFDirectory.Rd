@@ -26,6 +26,10 @@ If \code{all} is \code{TRUE} or a vector of image indices,
 then the result is a list of the above with
 one or more elements..
 }
+\author{
+Simon Urbanek
+Kent Johnson
+}
 \seealso{
 \code{\link{readTIFF}}
 }

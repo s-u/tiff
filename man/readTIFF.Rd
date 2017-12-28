@@ -68,8 +68,9 @@ direct acccess as it is intended mainly for viewing and not computation.
 }
 %\references{
 %}
-%\author{
-%}
+\author{
+Simon Urbanek
+}
 \note{
   Some non-standard formats such as 12-bit TIFFs are partially supported
   (there is no standard for packing order for TIFFs beoynd 8-bit so we
