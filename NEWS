@@ -1,5 +1,10 @@
 NEWS/Changelog
 
+0.1-7	(under development)
+    o	add C-level function registration
+
+    o	minor updates to DESCRIPTION
+
 0.1-6	2020-10-22
     o	update libtiff version/support for Windows
 
