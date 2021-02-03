@@ -8,7 +8,6 @@ if test -z "${R_HOME}"; then
 fi
 RBIN="${R_HOME}/bin/R"
 
-: ${PKG_CONFIG=pkg-config}
 : ${PKG_MODULE=libtiff-4}
 
 # pick all flags for testing from R
@@ -25,14 +24,14 @@ LIBS="${LIBS} ${PKG_LIBS}"
 CPPFLAGS="${CPPFLAGS} ${PKG_CPPFLAGS}"
 
 AC_PATH_PROG([PKG_CONFIG], [pkg-config])
-
-AC_CHECK_HEADERS([tiff.h tiffio.h])
+AC_LANG(C)
+AC_CHECK_HEADERS([unistd.h])
 
 AC_CHECK_LIB([tiff],[TIFFClientOpen],,[
   AC_MSG_NOTICE([Using libtiff directly doesn't work, falling back to pkg-config.])
   AC_MSG_NOTICE([Note that you can provide correct PKG_LIBS to allow installation without pkg-config.])
   AC_MSG_CHECKING([for pkg-config])
-  AS_IF([$PKG_CONFIG --version], , [AC_MSG_RESULT([no])
+  AS_IF(["$PKG_CONFIG" --version], , [AC_MSG_RESULT([no])
      AC_MSG_ERROR([Provided flags don't work and pkg-config is not present.
 You can either set PKG_LIBS to the correct flags or install pkg-config.])])
   AC_MSG_CHECKING([whether pkg-config knows about $PKG_MODULE])
@@ -43,7 +42,6 @@ You can either set PKG_LIBS to the correct flags or install pkg-config.])])
   LIBS0="$LIBS"
   LIBS="$LIBS0 ${TIFF_LIBS}"
   CPPFLAGS="$CPPFLAGS ${TIFF_CPPFLAGS}"
-  AC_CHECK_HEADERS([tiff.h tiffio.h])
   AC_MSG_CHECKING([whether ${TIFF_CPPFLAGS} ${TIFF_LIBS} works])
   AC_LINK_IFELSE([AC_LANG_CALL([], [TIFFClientOpen])], AC_MSG_RESULT([yes]), [
     AC_MSG_RESULT([no])
@@ -56,6 +54,13 @@ You can either set PKG_LIBS to the correct flags or install pkg-config.])])
     ])
   ])
 ])
+
+AC_MSG_NOTICE([ PKG_CPPFLAGS: $CPPFLAGS])
+AC_MSG_NOTICE([ PKG_LIBS    : $LIBS])
+
+## check headers only after we're done with pkg-config
+AC_CHECK_HEADERS([tiff.h tiffio.h],, [AC_MSG_ERROR([TIFF headers are not usable.
+Please make sure you have installed development files for libtiff.])])
 
 AC_ARG_VAR([PKG_CPPFLAGS],[custom C preprocessor flags for package compilation])
 AC_ARG_VAR([PKG_LIBS],[custom libraries for package compilation])

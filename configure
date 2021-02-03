@@ -2038,7 +2038,6 @@ if test -z "${R_HOME}"; then
 fi
 RBIN="${R_HOME}/bin/R"
 
-: ${PKG_CONFIG=pkg-config}
 : ${PKG_MODULE=libtiff-4}
 
 # pick all flags for testing from R
@@ -2094,6 +2093,11 @@ $as_echo "no" >&6; }
 fi
 
 
+ac_ext=c
+ac_cpp='$CPP $CPPFLAGS'
+ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
+ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
@@ -3282,13 +3286,12 @@ fi
 done
 
 
-for ac_header in tiff.h tiffio.h
+for ac_header in unistd.h
 do :
-  as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
-ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
-if eval test \"x\$"$as_ac_Header"\" = x"yes"; then :
+  ac_fn_c_check_header_mongrel "$LINENO" "unistd.h" "ac_cv_header_unistd_h" "$ac_includes_default"
+if test "x$ac_cv_header_unistd_h" = xyes; then :
   cat >>confdefs.h <<_ACEOF
-#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
+#define HAVE_UNISTD_H 1
 _ACEOF
 
 fi
@@ -3347,7 +3350,7 @@ $as_echo "$as_me: Using libtiff directly doesn't work, falling back to pkg-confi
 $as_echo "$as_me: Note that you can provide correct PKG_LIBS to allow installation without pkg-config." >&6;}
   { $as_echo "$as_me:${as_lineno-$LINENO}: checking for pkg-config" >&5
 $as_echo_n "checking for pkg-config... " >&6; }
-  if $PKG_CONFIG --version; then :
+  if "$PKG_CONFIG" --version; then :
 
 else
   { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
@@ -3370,19 +3373,6 @@ fi
   LIBS0="$LIBS"
   LIBS="$LIBS0 ${TIFF_LIBS}"
   CPPFLAGS="$CPPFLAGS ${TIFF_CPPFLAGS}"
-  for ac_header in tiff.h tiffio.h
-do :
-  as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
-ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
-if eval test \"x\$"$as_ac_Header"\" = x"yes"; then :
-  cat >>confdefs.h <<_ACEOF
-#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
-_ACEOF
-
-fi
-
-done
-
   { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether ${TIFF_CPPFLAGS} ${TIFF_LIBS} works" >&5
 $as_echo_n "checking whether ${TIFF_CPPFLAGS} ${TIFF_LIBS} works... " >&6; }
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
@@ -3444,6 +3434,29 @@ rm -f core conftest.err conftest.$ac_objext \
     conftest$ac_exeext conftest.$ac_ext
 
 fi
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}:  PKG_CPPFLAGS: $CPPFLAGS" >&5
+$as_echo "$as_me:  PKG_CPPFLAGS: $CPPFLAGS" >&6;}
+{ $as_echo "$as_me:${as_lineno-$LINENO}:  PKG_LIBS    : $LIBS" >&5
+$as_echo "$as_me:  PKG_LIBS    : $LIBS" >&6;}
+
+## check headers only after we're done with pkg-config
+for ac_header in tiff.h tiffio.h
+do :
+  as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
+ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
+if eval test \"x\$"$as_ac_Header"\" = x"yes"; then :
+  cat >>confdefs.h <<_ACEOF
+#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
+_ACEOF
+
+else
+  as_fn_error $? "TIFF headers are not usable.
+Please make sure you have installed development files for libtiff." "$LINENO" 5
+fi
+
+done
 
 
 
