@@ -1,6 +1,6 @@
 NEWS/Changelog
 
-0.1-7	(under development)
+0.1-7	2021-02-04
     o	unix: use autoconf to detect libtiff flags to support
 	static builds and optional tiff capabilities
 
