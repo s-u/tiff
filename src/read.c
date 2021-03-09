@@ -21,6 +21,10 @@ static void TIFF_add_info(TIFF *tiff, SEXP res) {
     float f;
     char *c = 0;
 
+    if (TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &i32))
+	setAttr(res, "width", ScalarInteger(i32));
+    if (TIFFGetField(tiff, TIFFTAG_IMAGELENGTH, &i32))
+	setAttr(res, "length", ScalarInteger(i32));
     if (TIFFGetField(tiff, TIFFTAG_IMAGEDEPTH, &i32))
 	setAttr(res, "depth", ScalarInteger(i32));
     if (TIFFGetField(tiff, TIFFTAG_BITSPERSAMPLE, &i16))
@@ -55,6 +59,16 @@ static void TIFF_add_info(TIFF *tiff, SEXP res) {
 	    setAttr(res, "planar.config", mkString(uv));
 	}
     }
+
+    if (TIFFGetField(tiff, TIFFTAG_ROWSPERSTRIP, &i32))
+        setAttr(res, "rows.per.strip", ScalarInteger(i32));
+
+    if (TIFFGetField(tiff, TIFFTAG_TILEWIDTH, &i32)) {
+        setAttr(res, "tile.width", ScalarInteger(i32));
+        TIFFGetField(tiff, TIFFTAG_TILELENGTH, &i32);
+        setAttr(res, "tile.length", ScalarInteger(i32));
+    }
+
     if (TIFFGetField(tiff, TIFFTAG_COMPRESSION, &i16)) {
 	char uv[24];
 	const char *name = 0;
@@ -82,6 +96,10 @@ static void TIFF_add_info(TIFF *tiff, SEXP res) {
 	setAttr(res, "x.resolution", ScalarReal(f));
     if (TIFFGetField(tiff, TIFFTAG_YRESOLUTION, &f))
 	setAttr(res, "y.resolution", ScalarReal(f));
+    if (TIFFGetField(tiff, TIFFTAG_XPOSITION, &f))
+	setAttr(res, "x.position", ScalarReal(f));
+    if (TIFFGetField(tiff, TIFFTAG_YPOSITION, &f))
+	setAttr(res, "y.position", ScalarReal(f));
     if (TIFFGetField(tiff, TIFFTAG_RESOLUTIONUNIT, &i16)) {
 	const char *name = "unknown";
 	switch (i16) {
