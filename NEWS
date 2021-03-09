@@ -1,5 +1,24 @@
 NEWS/Changelog
 
+0.1-8	(under development)
+	The following features have been inspired or ported from
+	https://github.com/akoyabio/tiff fork by Kent Johnson:
+
+    o	Add limited support for tiled images. Supports 8-, 16- and 32-bit
+	integer and float images with spp=1 or 3. No support for indexed,
+	color map, as.is, or planar format color.
+
+    o	Add the ability to read (or get info on) selected images by passing
+	a vector in the `all` parameter.
+
+    o	Add width, length, x.position, y.position, and, if available,
+	rows.per.strip, tile.width, tile.length to the directory
+	info returned when `info=TRUE`.
+
+    o	Stop with an error if `as.is=TRUE` is used with a float image.
+
+    o	Fixed documentation typos.
+
 0.1-7	2021-02-04
     o	unix: use autoconf to detect libtiff flags to support
 	static builds and optional tiff capabilities
@@ -7,9 +26,6 @@ NEWS/Changelog
     o	add C-level function registration
 
     o	minor updates to DESCRIPTION
-
-0.1-6	2020-10-22
-    o	update libtiff version/support for Windows
 
 0.1-5	2013-09-03
     o	bugfix: output of readTIFF(..., as.is=TRUE) with integer
