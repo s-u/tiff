@@ -12,25 +12,28 @@ readTIFF(source, native = FALSE, all = FALSE, convert = FALSE,
 }
 \arguments{
   \item{source}{Either name of the file to read from or a raw vector
-  representing the TIFF file content.}
-  \item{native}{determines the image representation - if \code{FALSE}
-  (the default) then the result is an array, if \code{TRUE} then the
-  result is a native raster representation (suitable for plotting).}
-\item{all}{TIFF files can contain more than one image, if \code{all =
-    TRUE} then all images are returenin a list, otherwsie only the first
-  image is returned.}
-\item{convert}{first convert the image into 8-bit RGBA samples and then
-  to an array, see below for details.}
-\item{info}{if set to \code{TRUE} then the resulting image(s) will also
-  contain information from TIFF tags as attributes}
-\item{indexed}{if set to \code{TRUE} then indexed images will be
+    representing the TIFF file content.}
+  \item{native}{logical, determines the image representation - if
+    \code{FALSE} (the default) then the result is an array, if
+    \code{TRUE} then the result is a native raster representation
+    (suitable for plotting).}
+  \item{all}{logical scalar or integer vector. TIFF files can contain
+    more than one image. If \code{all=TRUE} then all images are returned
+    in a list of images. If \code{all} is a vector, it gives the
+    (1-based) indices of images to return. Otherwise only the first
+    image is returned.}
+\item{convert}{logical, if \code{TRUE} then first convert the image into
+  8-bit RGBA samples and then to an array, see below for details.}
+\item{info}{logical, if set to \code{TRUE} then the resulting image(s)
+  will also contain information from TIFF tags as attributes}
+\item{indexed}{logical, if set to \code{TRUE} then indexed images will be
   returned in the indexed form, i.e., as a matrix of integer indices
   referencing into a color map which is returned in the
   \code{"color.map"} attribute. This flag cannot be combined with
   \code{convert} or \code{native} and has no effect on images that are
   not indexed.}
-\item{as.is}{attempt to return original values without re-scaling
-  where possible}
+\item{as.is}{logical, if \code{TRUE} an attempt will be made to return
+  the original integer values without re-scaling where possible}
 }
 \value{
 If \code{native} is \code{FALSE} then an array of the dimensions height
@@ -42,8 +45,11 @@ point sample storage which are unscaled reals, and for indexed and
 returned instead. The latter cannot be easily computed on but is the
 most efficient way to draw using \code{rasterImage}.
 
-If \code{all} is \code{TRUE} then the result is a list of the above with
-one or more elements..
+If \code{all} is \code{TRUE} or a vector of image indices,
+then the result is a list of the above with
+zero or more elements. If \code{all} is a vector of indices, the result
+will have exactly the same length as \code{all}. If an index does not
+appear in the file, the corresponding list entry will be \code{NULL}.
 }
 \details{
 Most common files decompress into RGB (3 channels), RGBA (4 channels),
@@ -65,8 +71,10 @@ direct acccess as it is intended mainly for viewing and not computation.
 }
 %\references{
 %}
-%\author{
-%}
+\author{
+  Simon Urbanek
+  Kent Johnson
+}
 \note{
   Some non-standard formats such as 12-bit TIFFs are partially supported
   (there is no standard for packing order for TIFFs beoynd 8-bit so we
@@ -81,14 +89,22 @@ direct acccess as it is intended mainly for viewing and not computation.
 \code{\link{rasterImage}}, \code{\link{writeTIFF}}
 }
 \examples{
+Rlogo <- system.file("img", "Rlogo.tiff", package="tiff")
+
 # read a sample file (R logo)
-img <- readTIFF(system.file("img", "Rlogo.tiff", package="tiff"))
+img <- readTIFF(Rlogo)
 
 # read it also in native format
-img.n <- readTIFF(system.file("img", "Rlogo.tiff", package="tiff"), native=TRUE)
+img.n <- readTIFF(Rlogo, native=TRUE)
 
 # and also in converted
-img.c <- readTIFF(system.file("img", "Rlogo.tiff", package="tiff"), convert=TRUE)
+img.c <- readTIFF(Rlogo, convert=TRUE)
+
+# read all contained images
+str(readTIFF(Rlogo, all=TRUE))
+
+# pick some images
+str(readTIFF(Rlogo, all=c(5, 1, 3)))
 
 # if your R supports it, we'll plot it
 if (exists("rasterImage")) { # can plot only in R 2.11.0 and higher

@@ -146,12 +146,19 @@ static void TIFF_add_info(TIFF *tiff, SEXP res) {
 SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEXP sIndexed, SEXP sOriginal) {
     SEXP res = R_NilValue, multi_res = R_NilValue, multi_tail = R_NilValue, dim;
     const char *fn;
-    int native = asInteger(sNative), all = (asInteger(sAll) == 1), n_img = 0,
+    int native = asInteger(sNative), all = (isLogical(sAll) && asInteger(sAll) > 0), n_img = 0,
 	convert = (asInteger(sConvert) == 1), add_info = (asInteger(sInfo) == 1),
 	indexed = (asInteger(sIndexed) == 1), original = (asInteger(sOriginal) == 1);
     tiff_job_t rj;
     TIFF *tiff;
     FILE *f;
+    int *pick = (isInteger(sAll) ? INTEGER(sAll) : 0);
+    int picks = pick ? LENGTH(sAll) : 0;
+    SEXP pick_res = pick ? PROTECT(allocVector(VECSXP, picks)) : 0;
+
+    /* make sure people don't use vector logicals - they must use which() if that's what they want */
+    if (!((isLogical(sAll) && LENGTH(sAll) == 1) || isInteger(sAll)))
+	Rf_error("`all' must be either a scalar logical (TRUE/FALSE) or an integer vector");
 
     if (indexed && (convert || native))
 	Rf_error("indexed and native/convert cannot both be TRUE as they are mutually exclusive");
@@ -173,13 +180,38 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
     if (!tiff)
 	Rf_error("Unable to open TIFF");
 
+    int cur_dir = 0; /* 1-based image number */
+    int nprot = 0;
     while (1) { /* loop over separate image in a directory if desired */
+	int pick_index = -1; /* not picked */
+	cur_dir++;
+
+	/* If sAll is a numeric vector, only read images referenced in it */
+	if (pick) {
+	    /* We don't use match() as it re-builds the hash table on every call. */
+	    int i = 0;
+	    while (i < picks) {
+		if (pick[i] == cur_dir) {
+		    pick_index = i;
+		    break;
+		}
+		i++;
+	    }
+
+	    if (pick_index == -1) { /* No match */
+		if (TIFFReadDirectory(tiff)) /* skip */
+		    continue;
+		else
+		    break;
+	    }
+	}
+
 	uint32 imageWidth = 0, imageLength = 0, imageDepth;
 	uint32 tileWidth, tileLength;
 	uint32 x, y;
 	uint16 config, bps = 8, spp = 1, sformat = 1, out_spp;
 	tdata_t buf;
-	double *ra;
+	double *ra = 0;
 	uint16 *colormap[3] = {0, 0, 0};
 	int is_float = 0;
 
@@ -200,8 +232,10 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 	    if (colormap[2]) out_spp = 3;
 	    else if (colormap[1]) out_spp = 2;
 	}
-#if TIFF_DEBUG
-	Rprintf("image %d x %d x %d, tiles %d x %d, bps = %d, spp = %d (output %d), config = %d, colormap = %s\n", imageWidth, imageLength, imageDepth, tileWidth, tileLength, bps, spp, out_spp, config, colormap[0] ? "yes" : "no");
+#ifdef TIFF_DEBUG
+	Rprintf("image %d x %d x %d, tiles %d x %d, bps = %d, spp = %d (output %d), config = %d, colormap = %s,\n",
+		imageWidth, imageLength, imageDepth, tileWidth, tileLength, bps, spp, out_spp, config, colormap[0] ? "yes" : "no");
+	Rprintf("      float = %d\n", is_float);
 #endif
 	
 	if (native || convert) {
@@ -273,22 +307,32 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 		return res;
 	    }
 	    n_img++;
-	    if (multi_res == R_NilValue) {
-		multi_tail = multi_res = CONS(res, R_NilValue);
-		PROTECT(multi_res);
-	    } else {
-		SEXP q = CONS(res, R_NilValue);
-		SETCDR(multi_tail, q);
-		multi_tail = q;
+	    if (pick_index >= 0)
+		SET_VECTOR_ELT(pick_res, pick_index, res);
+	    else {
+		if (multi_res == R_NilValue) {
+		    multi_tail = multi_res = CONS(res, R_NilValue);
+		    PROTECT(multi_res);
+		    nprot++;
+		} else {
+		    SEXP q = CONS(res, R_NilValue);
+		    SETCDR(multi_tail, q);
+		    multi_tail = q;
+		}
 	    }
 	    if (!TIFFReadDirectory(tiff))
 		break;
 	    continue;
-	}
-	
+	} /* end native || convert */
+
 	if (bps != 8 && bps != 16 && bps != 32 && ( bps != 12 || spp != 1 )) {
 	    TIFFClose(tiff);
 	    Rf_error("image has %d bits/sample which is unsupported in direct mode - use native=TRUE or convert=TRUE", bps);
+	}
+
+	if (original && is_float) {
+	    TIFFClose(tiff);
+	    Rf_error("as.is=TRUE is not supported for floating point images");
 	}
 
 	if (sformat == SAMPLEFORMAT_INT && !original)
@@ -306,7 +350,7 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 	    tsize_t plane_offset = 0;
 	    x = 0; y = 0; 
 	    buf = _TIFFmalloc(TIFFStripSize(tiff));
-#if TIFF_DEBUG
+#ifdef TIFF_DEBUG
 	    Rprintf(" - %d x %d strips\n", TIFFNumberOfStrips(tiff), TIFFStripSize(tiff));
 #endif
 	    for (strip = 0; strip < TIFFNumberOfStrips(tiff); strip++) {
@@ -317,7 +361,7 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 			int *ia = original ? INTEGER(res) : 0;
 			if (bps == 12) step += 2;
 			for (i = 0; i < n; i += step) {
-			  unsigned int ci = 0, ci2;
+			    unsigned int ci = 0, ci2 = 0;
 			    const unsigned char *v = (const unsigned char*) buf + i;
 			    if (bps == 8) ci = v[0];
 			    else if (bps == 16) ci = ((const unsigned short int*)v)[0];
@@ -443,15 +487,74 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 		    }
 		}
 	    }
-	} else {
-	    Rf_error("tile-based images are currently supported only with native=TRUE or convert=TRUE");
-	    buf = _TIFFmalloc(TIFFTileSize(tiff));
+	} else { /* tiled image */
+	    if (indexed || colormap[0] || bps == 12)
+		Rf_error("Indexed and 12-bit tiled images are not supported.");
 	    
+	    if (spp > 1 && config != PLANARCONFIG_CONTIG)
+		Rf_error("Planar format tiled images are not supported");
+
+#ifdef TIFF_DEBUG
+	    Rprintf(" - %d x %d tiles\n", TIFFNumberOfTiles(tiff), TIFFTileSize(tiff));
+#endif
+	    x = 0; y = 0;
+	    buf = _TIFFmalloc(TIFFTileSize(tiff));
+
 	    for (y = 0; y < imageLength; y += tileLength)
-		for (x = 0; x < imageWidth; x += tileWidth)
-		    TIFFReadTile(tiff, buf, x, y, 0 /*depth*/, 0 /*plane*/);
+		for (x = 0; x < imageWidth; x += tileWidth) {
+		    tsize_t n = TIFFReadTile(tiff, buf, x, y, 0 /*depth*/, 0 /*plane*/);
+		    if (spp == 1) {
+			/* config doesn't matter for spp == 1 */
+			/* direct gray */
+			tsize_t i, step = bps / 8;
+			uint32 xoff=0, yoff=0;
+			for (i = 0; i < n; i += step) {
+			    double val = NA_REAL;
+			    const unsigned char *v = (const unsigned char*) buf + i;
+			    if (bps == 8) val = ((double) v[0]) / 255.0;
+			    else if (bps == 16) val = ((double) ((const unsigned short int*)v)[0]) / 65535.0;
+			    else if (bps == 32) {
+				if (is_float) val = (double) ((const float*)v)[0];
+				else val = ((double) ((const unsigned int*)v)[0]) / 4294967296.0;
+			    }
+			    if (x + xoff < imageWidth && y + yoff < imageLength)
+				ra[imageLength * (x + xoff) + y + yoff] = val;
+			    xoff++;
+			    if (xoff >= tileWidth) {
+				xoff -= tileWidth;
+				yoff++;
+			    }
+			}
+		    } else if (config == PLANARCONFIG_CONTIG) { /* interlaced */
+			tsize_t i, j, step = spp * bps / 8;
+			uint32 xoff=0, yoff=0;
+			for (i = 0; i < n; i += step) {
+			    const unsigned char *v = (const unsigned char*) buf + i;
+			    if (x + xoff < imageWidth && y + yoff < imageLength) {
+				if (bps == 8) {
+				    for (j = 0; j < spp; j++)
+					ra[(imageLength * imageWidth * j) + imageLength * (x + xoff) + y + yoff] = ((double) v[j]) / 255.0;
+				} else if (bps == 16) {
+				    for (j = 0; j < spp; j++)
+					ra[(imageLength * imageWidth * j) + imageLength * (x + xoff) + y + yoff] = ((double) ((const unsigned short int*)v)[j]) / 65535.0;
+				} else if (bps == 32 && !is_float) {
+				    for (j = 0; j < spp; j++)
+					ra[(imageLength * imageWidth * j) + imageLength * (x + xoff) + y + yoff] = ((double) ((const unsigned int*)v)[j]) / 4294967296.0;
+				} else if (bps == 32 && is_float) {
+				    for (j = 0; j < spp; j++)
+					ra[(imageLength * imageWidth * j) + imageLength * (x + xoff) + y + yoff] = (double) ((const float*)v)[j];
+				}
+			    }
+			    xoff++;
+			    if (xoff >= tileWidth) {
+				xoff -= tileWidth;
+				yoff++;
+			    }
+			} /* for i */
+		    } /* PLANARCONFIG_CONTIG */
+		} /* for x */
 	}
-	
+
 	_TIFFfree(buf);
 
 	PROTECT(res);
@@ -476,25 +579,37 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 	    TIFF_add_info(tiff, res);
 	UNPROTECT(1);
 	
-	if (!all) {
+	if (isLogical(sAll) && asInteger(sAll) == 0) {
 	    TIFFClose(tiff);
 	    return res;
 	}
 	n_img++;
-	if (multi_res == R_NilValue) {
-	    multi_tail = multi_res = CONS(res, R_NilValue);
-	    PROTECT(multi_res);
-	} else {
-	    SEXP q = CONS(res, R_NilValue);
-	    SETCDR(multi_tail, q);
-	    multi_tail = q;
+	if (pick_index >= 0)
+	    SET_VECTOR_ELT(pick_res, pick_index, res);
+	else {
+	    if (multi_res == R_NilValue) {
+		multi_tail = multi_res = CONS(res, R_NilValue);
+		PROTECT(multi_res);
+		nprot++;
+	    } else {
+		SEXP q = CONS(res, R_NilValue);
+		SETCDR(multi_tail, q);
+		multi_tail = q;
+	    }
 	}
 	if (!TIFFReadDirectory(tiff))
 	    break;
     }
     TIFFClose(tiff);
+    /* if picked, we already have the result list */
+    if (pick) {
+	UNPROTECT(nprot + 1 /* pick_res is the +1 */);
+	return pick_res;
+    }
+
     /* convert LISTSXP into VECSXP */
     PROTECT(res = allocVector(VECSXP, n_img));
+    nprot++;
     {
 	int i = 0;
 	while (multi_res != R_NilValue) {
@@ -503,6 +618,6 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 	    multi_res = CDR(multi_res);
 	}
     }
-    UNPROTECT(2);
+    UNPROTECT(nprot);
     return res;
 }
