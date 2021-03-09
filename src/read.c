@@ -257,12 +257,13 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 		    TIFF_add_info(tiff, res);
 		UNPROTECT(1);
 	    } else {
+		SEXP R_ChannelsSymbol = Rf_install("channels");
 		dim = allocVector(INTSXP, 2);
 		INTEGER(dim)[0] = imageLength;
 		INTEGER(dim)[1] = imageWidth;
 		setAttrib(res, R_DimSymbol, dim);
 		setAttrib(res, R_ClassSymbol, mkString("nativeRaster"));
-		setAttrib(res, install("channels"), ScalarInteger(out_spp));
+		setAttrib(res, R_ChannelsSymbol, ScalarInteger(out_spp));
 		if (add_info)
 		    TIFF_add_info(tiff, res);
 		UNPROTECT(1);
