@@ -8,7 +8,8 @@ Reads an image from a TIFF file/content into a raster array.
 }
 \usage{
 readTIFF(source, native = FALSE, all = FALSE, convert = FALSE,
-         info = FALSE, indexed = FALSE, as.is = FALSE)
+         info = FALSE, indexed = FALSE, as.is = FALSE,
+	 payload = TRUE)
 }
 \arguments{
   \item{source}{Either name of the file to read from or a raw vector
@@ -34,6 +35,9 @@ readTIFF(source, native = FALSE, all = FALSE, convert = FALSE,
   not indexed.}
 \item{as.is}{logical, if \code{TRUE} an attempt will be made to return
   the original integer values without re-scaling where possible}
+\item{payload}{logical, if \code{FALSE} then only metadata about the
+  image(s) is returned, but not the actual image. Implies
+  \code{info=TRUE} and all image-related flags are ignored.}
 }
 \value{
 If \code{native} is \code{FALSE} then an array of the dimensions height
@@ -50,6 +54,13 @@ then the result is a list of the above with
 zero or more elements. If \code{all} is a vector of indices, the result
 will have exactly the same length as \code{all}. If an index does not
 appear in the file, the corresponding list entry will be \code{NULL}.
+
+If code{payload=FALSE} then the result is equivalent to
+\code{info=TRUE} but without the image data and returned as a list.
+If \code{all} is either \code{TRUE} or a vector then the result will
+be either a matrix (if the same tags are present in all images) or a
+list (images) of names lists (information about each image). Otherwise
+the result is a named list with the information about the fist image.
 }
 \details{
 Most common files decompress into RGB (3 channels), RGBA (4 channels),
@@ -105,6 +116,9 @@ str(readTIFF(Rlogo, all=TRUE))
 
 # pick some images
 str(readTIFF(Rlogo, all=c(5, 1, 3)))
+
+# only show information
+str(readTIFF(Rlogo, payload=FALSE))
 
 # if your R supports it, we'll plot it
 if (exists("rasterImage")) { # can plot only in R 2.11.0 and higher

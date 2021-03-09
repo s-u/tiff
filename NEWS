@@ -1,7 +1,10 @@
 NEWS/Changelog
 
 0.1-8	(under development)
-	The following features have been inspired or ported from
+    o	add support for readTIFF(..., payload=FALSE) which only retrieves
+	metadata information from the file.
+
+    --	The following features have been inspired or ported from
 	https://github.com/akoyabio/tiff fork by Kent Johnson:
 
     o	Add limited support for tiled images. Supports 8-, 16- and 32-bit

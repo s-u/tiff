@@ -160,13 +160,15 @@ static void TIFF_add_info(TIFF *tiff, SEXP res) {
 	setAttr(res, "color.space", mkString(name));
     }
 }
-    
-SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEXP sIndexed, SEXP sOriginal) {
-    SEXP res = R_NilValue, multi_res = R_NilValue, multi_tail = R_NilValue, dim;
+
+SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEXP sIndexed, SEXP sOriginal,
+	       SEXP sPayload) {
+    SEXP res = R_NilValue, multi_res = R_NilValue, multi_tail = R_NilValue, dim = R_NilValue;
     const char *fn;
     int native = asInteger(sNative), all = (isLogical(sAll) && asInteger(sAll) > 0), n_img = 0,
 	convert = (asInteger(sConvert) == 1), add_info = (asInteger(sInfo) == 1),
-	indexed = (asInteger(sIndexed) == 1), original = (asInteger(sOriginal) == 1);
+	indexed = (asInteger(sIndexed) == 1), original = (asInteger(sOriginal) == 1),
+	info_only = (asInteger(sPayload) == 0);
     tiff_job_t rj;
     TIFF *tiff;
     FILE *f;
@@ -222,6 +224,37 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 		else
 		    break;
 	    }
+	}
+
+
+	if (info_only) {
+	    /* dummy result object */
+	    res = PROTECT(allocVector(INTSXP, 0));
+	    TIFF_add_info(tiff, res);
+
+	    if (isLogical(sAll) && asInteger(sAll) == 0) {
+		UNPROTECT(1);
+		TIFFClose(tiff);
+		return res;
+	    }
+	    n_img++;
+	    if (pick_index >= 0)
+		SET_VECTOR_ELT(pick_res, pick_index, res);
+	    else {
+		if (multi_res == R_NilValue) {
+		    multi_tail = multi_res = CONS(res, R_NilValue);
+		    PROTECT(multi_res);
+		    nprot++;
+		} else {
+		    SEXP q = CONS(res, R_NilValue);
+		    SETCDR(multi_tail, q);
+		    multi_tail = q;
+		}
+	    }
+	    UNPROTECT(1);
+	    if (!TIFFReadDirectory(tiff))
+		break;
+	    continue;
 	}
 
 	uint32 imageWidth = 0, imageLength = 0, imageDepth;
