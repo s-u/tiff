@@ -2,7 +2,7 @@ NEWS/Changelog
 
 0.1-8	(under development)
     o	add support for readTIFF(..., payload=FALSE) which only retrieves
-	metadata information from the file.
+	metadata information from the file
 
     --	The following features have been inspired or ported from
 	https://github.com/akoyabio/tiff fork by Kent Johnson:
@@ -11,16 +11,18 @@ NEWS/Changelog
 	integer and float images with spp=1 or 3. No support for indexed,
 	color map, as.is, or planar format color.
 
-    o	Add the ability to read (or get info on) selected images by passing
-	a vector in the `all` parameter.
+    o	add the ability to read (or get info on) selected images by passing
+	a vector in the `all` parameter
 
-    o	Add width, length, x.position, y.position, and, if available,
+    o	add width, length, x.position, y.position, and, if available,
 	rows.per.strip, tile.width, tile.length to the directory
 	info returned when `info=TRUE`.
 
-    o	Stop with an error if `as.is=TRUE` is used with a float image.
+    o	stop with an error if `as.is=TRUE` is used with a float image
 
-    o	Fixed documentation typos.
+    o	fixed documentation typos
+
+    o	writeTIFF() uses path.expand() on supplied path
 
 0.1-7	2021-02-04
     o	unix: use autoconf to detect libtiff flags to support
