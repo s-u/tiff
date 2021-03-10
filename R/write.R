@@ -6,5 +6,5 @@ writeTIFF <- function(what, where, bits.per.sample = 8L,
     compression <- match.arg(compression)
     compression <- compressions[match(compression, names(compressions))]
   }
-  .Call(write_tiff, what, where, bits.per.sample, compression, reduce)
+  .Call(write_tiff, what, if (is.raw(where)) where else path.expand(where), bits.per.sample, compression, reduce)
 }
