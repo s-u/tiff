@@ -1,0 +1,54 @@
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+name: R-CMD-check
+
+jobs:
+  R-CMD-check:
+    runs-on: ${{ matrix.config.os }}
+
+    name: ${{ matrix.config.os }} (${{ matrix.config.r }})
+
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+        - { os: windows-latest, r: 'release'}
+        - { os: macOS-10.15, r: 'release'}
+        - { os: ubuntu-20.04, r: 'release'}
+
+    env:
+      CRAN: ${{ matrix.config.cran }}
+
+    steps:
+      - uses: actions/checkout@v1
+
+      - uses: r-lib/actions/setup-r@master
+        with:
+          r-version: ${{ matrix.config.r }}
+
+      - name: Build
+        run: "sh -c '(cd ..; R CMD build tiff)'"
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: "sudo apt-get install -y libtiff-dev"
+
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: "for i in pkgconfig-0.28 xz-5.2.4 jpeg-9 tiff-4.1.0; do curl -s https://mac.r-project.org/libs-4/$i-darwin.17-x86_64.tar.gz | sudo tar fxz - --strip 2 -C /usr/local; done"
+
+      - name: R CMD check
+        run: "bash -c 'R CMD check --no-manual ../tiff_*.tar.gz'"
+
+      - name: Upload check results
+        if: failure()
+        uses: actions/upload-artifact@master
+        with:
+          name: ${{ runner.os }}-r${{ matrix.config.r }}-results
+          path: tiff.Rcheck
