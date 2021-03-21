@@ -8,10 +8,16 @@ readTIFF <- function(source, native=FALSE, all=FALSE, convert=FALSE, info=FALSE,
        		  if (is.raw(source)) source else path.expand(source), FALSE,
 		  if (is.numeric(all)) as.integer(all) else all, FALSE, TRUE, FALSE, FALSE, FALSE)
        if (is.integer(x))
-          attributes(x)
+           as.data.frame(attributes(x), stringsAsFactors=FALSE)
        else {
-          x <- sapply(x, attributes)
-	  if (is.matrix(x)) t(x) else x
+           x <- lapply(x, attributes)
+           u <- unique(unlist(lapply(x, names)))
+           do.call("rbind", lapply(x, function(o) {
+               o <- c(o, list(`NA`=NA))
+               d <- o[match(u, names(o), length(o))]
+               names(d)=u
+               d
+           }))
        }
     }
 }

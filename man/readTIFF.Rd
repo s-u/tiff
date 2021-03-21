@@ -55,12 +55,10 @@ zero or more elements. If \code{all} is a vector of indices, the result
 will have exactly the same length as \code{all}. If an index does not
 appear in the file, the corresponding list entry will be \code{NULL}.
 
-If code{payload=FALSE} then the result is equivalent to
-\code{info=TRUE} but without the image data and returned as a list.
+If \code{payload=FALSE} then the result is equivalent to
+\code{info=TRUE} but without the image data and returned as a data frame.
 If \code{all} is either \code{TRUE} or a vector then the result will
-be either a matrix (if the same tags are present in all images) or a
-list (images) of names lists (information about each image). Otherwise
-the result is a named list with the information about the fist image.
+be a data frame with each row corresponding to one image.
 }
 \details{
 Most common files decompress into RGB (3 channels), RGBA (4 channels),
