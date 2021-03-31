@@ -1,6 +1,6 @@
 NEWS/Changelog
 
-0.1-8	(under development)
+0.1-8	2021-03-31
     o	add support for readTIFF(..., payload=FALSE) which only retrieves
 	metadata information from the file
 
