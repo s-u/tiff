@@ -296,10 +296,9 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 	    /* FIXME: TIFF handle leak in case this fails */
 	    if (convert)
 		PROTECT(tmp = allocVector(REALSXP, imageWidth * imageLength * out_spp));
-	    res = allocVector(INTSXP, imageWidth * imageLength);
-
+	    res = PROTECT(allocVector(INTSXP, imageWidth * imageLength));
 	    TIFFReadRGBAImage(tiff, imageWidth, imageLength, (uint32*) INTEGER(res), 0);
-	    PROTECT(res);
+
 	    /* TIFF uses flipped y-axis, so we need to invert it .. argh ... */
 	    if (imageLength > 1) {
 		int *line = INTEGER(allocVector(INTSXP, imageWidth));
@@ -353,7 +352,7 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 		    TIFF_add_info(tiff, res);
 		UNPROTECT(1);
 	    }
-	    if (!all) {
+	    if (!all && !picks) {
 		TIFFClose(tiff);
 		return res;
 	    }
