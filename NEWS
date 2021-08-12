@@ -1,5 +1,10 @@
 NEWS/Changelog
 
+0.1-9
+    o	bugfix: readTIFF(..., native=TRUE) returned incorrect results when
+	the all parameter was used to pick individual images. (#10)
+
+
 0.1-8	2021-03-31
     o	add support for readTIFF(..., payload=FALSE) which only retrieves
 	metadata information from the file
