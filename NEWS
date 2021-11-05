@@ -1,6 +1,10 @@
 NEWS/Changelog
 
-0.1-9
+0.1-10
+    o	Silence benign warnings in some compilers.
+
+
+0.1-9	2021-08-13
     o	bugfix: readTIFF(..., native=TRUE) returned incorrect results when
 	the all parameter was used to pick individual images. (#10)
 
