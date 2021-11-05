@@ -1,4 +1,4 @@
-AC_INIT(tiff, 1.0, Simon.Urbanek@r-project.org)
+AC_INIT([tiff],[1.0],[Simon.Urbanek@r-project.org])
 AC_CONFIG_SRCDIR(src/common.c)
 
 # find R home and set correct compiler + flags
