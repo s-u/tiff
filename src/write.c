@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #include "common.h"
 
@@ -33,7 +34,7 @@ SEXP write_tiff(SEXP image, SEXP where, SEXP sBPS, SEXP sCompr, SEXP sReduce) {
     int native = 0, raw_array = 0, bps = asInteger(sBPS), compression = asInteger(sCompr),
 	reduce = asInteger(sReduce),
 	img_index = 0, n_img = 1;
-    uint32 width, height, planes = 1;
+    uint32_t width, height, planes = 1;
 
     if (TYPEOF(image) == VECSXP) {
 	if ((n_img = LENGTH(image)) == 0) {
@@ -127,7 +128,7 @@ SEXP write_tiff(SEXP image, SEXP where, SEXP sBPS, SEXP sCompr, SEXP sReduce) {
 		    reduce = 0;
 		else { /* we only reduce to RGB, GA or G */
 		    int out_spp = ((an & HAS_ALPHA) ? 1 : 0 ) + ((an & IS_RGB) ? 3 : 1);
-		    uint32 i = 1, n = width * height;
+		    uint32_t i = 1, n = width * height;
 		    tdata_t buf;
 		    unsigned char *data8;
 		    const unsigned int *nd = (const unsigned int*) INTEGER(image);
@@ -177,13 +178,13 @@ SEXP write_tiff(SEXP image, SEXP where, SEXP sBPS, SEXP sCompr, SEXP sReduce) {
 		TIFFWriteEncodedStrip(tiff, 0, INTEGER(image), width * height * 4);
 	    }
 	} else {
-	    uint32 x, y, pl;
+	    uint32_t x, y, pl;
 	    tdata_t buf;
 	    unsigned char *data8;
 	    unsigned short *data16;
 	    unsigned int *data32;
 	    double *ra = REAL(image);
-	    uint32 i, N = LENGTH(image);
+	    uint32_t i, N = LENGTH(image);
 	    for (i = 0; i < N; i++) /* do a pre-flight check */
 		if (ra[i] < 0.0 || ra[i] > 1.0) {
 		    Rf_warning("The input contains values outside the [0, 1] range - storage of such values is undefined");

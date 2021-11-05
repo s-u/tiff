@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #include "common.h"
 
@@ -16,8 +17,8 @@ static void setAttr(SEXP x, const char *name, SEXP val) {
 /* add information attributes according to the TIFF tags.
    Only a somewhat random set (albeit mostly baseline) is supported */
 static void TIFF_add_info(TIFF *tiff, SEXP res) {
-    uint32 i32;
-    uint16 i16;
+    uint32_t i32;
+    uint16_t i16;
     float f;
     char *c = 0;
 
@@ -257,13 +258,13 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 	    continue;
 	}
 
-	uint32 imageWidth = 0, imageLength = 0, imageDepth;
-	uint32 tileWidth, tileLength;
-	uint32 x, y;
-	uint16 config, bps = 8, spp = 1, sformat = 1, out_spp;
+	uint32_t imageWidth = 0, imageLength = 0, imageDepth;
+	uint32_t tileWidth, tileLength;
+	uint32_t x, y;
+	uint16_t config, bps = 8, spp = 1, sformat = 1, out_spp;
 	tdata_t buf;
 	double *ra = 0;
-	uint16 *colormap[3] = {0, 0, 0};
+	uint16_t *colormap[3] = {0, 0, 0};
 	int is_float = 0;
 
 	TIFFGetField(tiff, TIFFTAG_IMAGEWIDTH, &imageWidth);
@@ -297,7 +298,7 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 	    if (convert)
 		PROTECT(tmp = allocVector(REALSXP, imageWidth * imageLength * out_spp));
 	    res = PROTECT(allocVector(INTSXP, imageWidth * imageLength));
-	    TIFFReadRGBAImage(tiff, imageWidth, imageLength, (uint32*) INTEGER(res), 0);
+	    TIFFReadRGBAImage(tiff, imageWidth, imageLength, (uint32_t*) INTEGER(res), 0);
 
 	    /* TIFF uses flipped y-axis, so we need to invert it .. argh ... */
 	    if (imageLength > 1) {
@@ -313,8 +314,8 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 		}
 	    }
 	    if (convert) {
-		uint16 s;
-		uint32 *data = (uint32*) INTEGER(res);
+		uint16_t s;
+		uint32_t *data = (uint32_t*) INTEGER(res);
 		ra = REAL(tmp);
 		for (x = 0; x < imageWidth; x++)
 		    for (y = 0; y < imageLength; y++) {
@@ -557,7 +558,7 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 			/* config doesn't matter for spp == 1 */
 			/* direct gray */
 			tsize_t i, step = bps / 8;
-			uint32 xoff=0, yoff=0;
+			uint32_t xoff=0, yoff=0;
 			for (i = 0; i < n; i += step) {
 			    double val = NA_REAL;
 			    const unsigned char *v = (const unsigned char*) buf + i;
@@ -577,7 +578,7 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 			}
 		    } else if (config == PLANARCONFIG_CONTIG) { /* interlaced */
 			tsize_t i, j, step = spp * bps / 8;
-			uint32 xoff=0, yoff=0;
+			uint32_t xoff=0, yoff=0;
 			for (i = 0; i < n; i += step) {
 			    const unsigned char *v = (const unsigned char*) buf + i;
 			    if (x + xoff < imageWidth && y + yoff < imageLength) {
