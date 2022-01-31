@@ -1,6 +1,10 @@
 NEWS/Changelog
 
-0.1-10
+0.1-11	2022-01-31
+    o	add Windows UCRT support
+
+
+0.1-10	2021-11-05
     o	Silence benign warnings in some compilers.
 
 
