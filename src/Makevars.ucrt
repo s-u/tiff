@@ -1,0 +1,6 @@
+PKG_LIBS = -ltiff -ljpeg -lz -lzstd -lwebp -llzma 
+
+all: clean 
+
+clean:
+	rm -f $(SHLIB) $(OBJECTS)
