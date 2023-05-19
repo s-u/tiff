@@ -1,4 +1,5 @@
-PKG_LIBS = -ltiff -ljpeg -lz -lzstd -lwebp -llzma 
+LIBSHARPYUV = $(or $(and $(wildcard $(R_TOOLS_SOFT)/lib/libsharpyuv.a),-lsharpyuv),)
+PKG_LIBS = -ltiff -ljpeg -lz -lzstd -lwebp $(LIBSHARPYUV) -llzma
 
 all: clean 
 
