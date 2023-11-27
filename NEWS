@@ -1,5 +1,11 @@
 NEWS/Changelog
 
+0.1-12	2023-11-28
+    o	updated Windows flags (#12)
+
+    o	replace () with (void) in a declaration
+
+
 0.1-11	2022-01-31
     o	add Windows UCRT support
 
