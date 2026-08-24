@@ -5,8 +5,16 @@ on:
   pull_request:
     branches:
       - master
+  workflow_dispatch:
 
 name: R-CMD-check
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   R-CMD-check:
@@ -19,36 +27,41 @@ jobs:
       matrix:
         config:
         - { os: windows-latest, r: 'release'}
-        - { os: macOS-10.15, r: 'release'}
-        - { os: ubuntu-20.04, r: 'release'}
+        - { os: macOS-latest,   r: 'release'}
+        - { os: ubuntu-latest,  r: 'release'}
+        - { os: ubuntu-latest,  r: 'oldrel-1'}
+        - { os: ubuntu-latest,  r: 'devel', http-user-agent: 'release'}
 
     env:
-      CRAN: ${{ matrix.config.cran }}
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      R_KEEP_PKG_SOURCE: yes
 
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v5
 
-      - uses: r-lib/actions/setup-r@master
+      - uses: r-lib/actions/setup-r@v2
         with:
           r-version: ${{ matrix.config.r }}
-
-      - name: Build
-        run: "sh -c '(cd ..; R CMD build tiff)'"
+          http-user-agent: ${{ matrix.config.http-user-agent }}
+          use-public-rspm: true
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
-        run: "sudo apt-get install -y libtiff-dev"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libtiff-dev libjpeg-dev pkg-config
 
       - name: Install macOS dependencies
         if: runner.os == 'macOS'
-        run: "for i in pkgconfig-0.28 xz-5.2.4 jpeg-9 tiff-4.1.0; do curl -s https://mac.r-project.org/libs-4/$i-darwin.17-x86_64.tar.gz | sudo tar fxz - --strip 2 -C /usr/local; done"
+        run: brew install libtiff jpeg-turbo pkg-config
 
-      - name: R CMD check
-        run: "bash -c 'R CMD check --no-manual ../tiff_*.tar.gz'"
-
-      - name: Upload check results
-        if: failure()
-        uses: actions/upload-artifact@master
+      - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          name: ${{ runner.os }}-r${{ matrix.config.r }}-results
-          path: tiff.Rcheck
+          extra-packages: any::rcmdcheck
+          needs: check
+
+      - uses: r-lib/actions/check-r-package@v2
+        with:
+          args: 'c("--no-manual", "--as-cran")'
+          error-on: '"warning"'
+          upload-snapshots: true
