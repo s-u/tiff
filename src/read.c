@@ -198,8 +198,10 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
     }
 
     tiff = TIFF_Open("rmc", &rj); /* no mmap, no chopping */
-    if (!tiff)
+    if (!tiff) {
+	if (f) fclose(f);
 	Rf_error("Unable to open TIFF");
+    }
 
     int cur_dir = 0; /* 1-based image number */
     int nprot = 0;
@@ -539,11 +541,15 @@ SEXP read_tiff(SEXP sFn, SEXP sNative, SEXP sAll, SEXP sConvert, SEXP sInfo, SEX
 		}
 	    }
 	} else { /* tiled image */
-	    if (indexed || colormap[0] || bps == 12)
+	    if (indexed || colormap[0] || bps == 12) {
+		TIFFClose(tiff);
 		Rf_error("Indexed and 12-bit tiled images are not supported.");
+	    }
 	    
-	    if (spp > 1 && config != PLANARCONFIG_CONTIG)
+	    if (spp > 1 && config != PLANARCONFIG_CONTIG) {
+		TIFFClose(tiff);
 		Rf_error("Planar format tiled images are not supported");
+	    }
 
 #ifdef TIFF_DEBUG
 	    Rprintf(" - %d x %d tiles\n", TIFFNumberOfTiles(tiff), TIFFTileSize(tiff));
