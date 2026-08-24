@@ -26,6 +26,24 @@ int analyze_native(const unsigned int *what, int length) {
     return alpha | (ac << 1);
 }
 
+/* Close the TIFF before raising an R error.
+
+   Rf_error() performs a longjmp, so an error raised after TIFF_Open() would
+   otherwise return to R with the TIFF still open. That matters because the
+   TIFF's client data is the stack-allocated tiff_job_t below, and because
+   common.c keeps the most recently opened TIFF in the static `last_tiff`.
+   The next libtiff error - e.g. a subsequent readTIFF() on a file with an
+   unreadable header - makes TIFFErrorHandler_() call TIFFClose(last_tiff)
+   on that stale TIFF, dereferencing a stack frame that no longer exists.
+
+   TIFFClose() also runs TIFFCloseProc_(), which fcloses the output file (or
+   frees the in-memory buffer) and resets last_tiff, so this is the complete
+   cleanup for both output targets. */
+static void tiff_close_and_error(TIFF *tiff, const char *msg) {
+    TIFFClose(tiff);
+    Rf_error("%s", msg);
+}
+
 SEXP write_tiff(SEXP image, SEXP where, SEXP sBPS, SEXP sCompr, SEXP sReduce) {
     SEXP dims, img_list = 0;
     tiff_job_t rj;
@@ -81,11 +99,11 @@ SEXP write_tiff(SEXP image, SEXP where, SEXP sBPS, SEXP sCompr, SEXP sReduce) {
 	    raw_array = 1;
 
 	if (!native && !raw_array && TYPEOF(image) != REALSXP)
-	    Rf_error("image must be a matrix or array of raw or real numbers");
+	    tiff_close_and_error(tiff, "image must be a matrix or array of raw or real numbers");
 	
 	dims = Rf_getAttrib(image, R_DimSymbol);
 	if (dims == R_NilValue || TYPEOF(dims) != INTSXP || LENGTH(dims) < 2 || LENGTH(dims) > 3)
-	    Rf_error("image must be a matrix or an array of two or three dimensions");
+	    tiff_close_and_error(tiff, "image must be a matrix or an array of two or three dimensions");
 	
 	if (raw_array && LENGTH(dims) == 3) { /* raw arrays have either bpp, width, height or width, height dimensions */
 	    planes = INTEGER(dims)[0];
@@ -99,7 +117,7 @@ SEXP write_tiff(SEXP image, SEXP where, SEXP sBPS, SEXP sCompr, SEXP sReduce) {
 	}
 	
 	if (planes < 1 || planes > 4)
-	    Rf_error("image must have either 1 (grayscale), 2 (GA), 3 (RGB) or 4 (RGBA) planes");
+	    tiff_close_and_error(tiff, "image must have either 1 (grayscale), 2 (GA), 3 (RGB) or 4 (RGBA) planes");
 	
 	if (native) { /* nativeRaster should have a "channels" attribute if it has anything else than 4 channels */
 	    SEXP cha = getAttrib(image, install("channels"));
@@ -112,7 +130,7 @@ SEXP write_tiff(SEXP image, SEXP where, SEXP sBPS, SEXP sCompr, SEXP sReduce) {
 	}
 	if (raw_array) {
 	    if (planes != 4)
-		Rf_error("Only RGBA format is supported as raw data");
+		tiff_close_and_error(tiff, "Only RGBA format is supported as raw data");
 	    native = 1; /* from now on we treat raw arrays like native */
 	}
 	
@@ -200,7 +218,7 @@ SEXP write_tiff(SEXP image, SEXP where, SEXP sBPS, SEXP sCompr, SEXP sReduce) {
 	    data16 = (unsigned short*) buf;
 	    data32 = (unsigned int*) buf;
 	    if (!buf)
-		Rf_error("cannot allocate output image buffer");
+		tiff_close_and_error(tiff, "cannot allocate output image buffer");
 	    if (bps == 8)
 		for (y = 0; y < height; y++)
 		    for (x = 0; x < width; x++)
