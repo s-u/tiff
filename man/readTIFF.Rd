@@ -76,7 +76,7 @@ format with 8-bit samples (i.e. total of 32-bit per pixel) and then
 store the relevant components from there into real arrays. This is the
 same path as used by \code{native=TRUE} and so differs only in the
 output value. Note that conversion may result in different values than
-direct acccess as it is intended mainly for viewing and not computation.
+direct access as it is intended mainly for viewing and not computation.
 }
 %\references{
 %}
@@ -86,7 +86,7 @@ direct acccess as it is intended mainly for viewing and not computation.
 }
 \note{
   Some non-standard formats such as 12-bit TIFFs are partially supported
-  (there is no standard for packing order for TIFFs beoynd 8-bit so we
+  (there is no standard for packing order for TIFFs beyond 8-bit so we
   assume big-endian packing similar to the default fill order and only
   support single channel or indexed).
 

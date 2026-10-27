@@ -4,7 +4,7 @@
 [![RForge](https://rforge.net/do/versvg/tiff)](https://RForge.net/tiff)
 [![tiff check](https://github.com/s-u/tiff/actions/workflows/check.yml/badge.svg)](https://github.com/s-u/tiff/actions/workflows/check.yml)
 
-__tiff__ R package supports TIFF (Tag Image File Format) image format. [readTIFF](https://rforge.net/doc/packages/tiff/readTIFF.html) reads one of more images from a TIFF file, [writeTIFF](https://rforge.net/doc/packages/tiff/writeTIFF.html) writes image data into a TIFF file. See the corresponsing [R documentation](https://rforge.net/doc/packages/tiff/00Index.html).
+__tiff__ R package supports TIFF (Tag Image File Format) image format. [readTIFF](https://rforge.net/doc/packages/tiff/readTIFF.html) reads one of more images from a TIFF file, [writeTIFF](https://rforge.net/doc/packages/tiff/writeTIFF.html) writes image data into a TIFF file. See the corresponding [R documentation](https://rforge.net/doc/packages/tiff/00Index.html).
 
 See also [tiff on RForge.net](https://rforge.net/tiff)
 

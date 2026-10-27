@@ -29,7 +29,7 @@ writeTIFF(what, where, bits.per.sample = 8L,
 }
 \value{
   If \code{where} is a raw vector then the value is the raw vector
-  containg the TIFF contents, otherwise a scalar integer specifying the
+  containing the TIFF contents, otherwise a scalar integer specifying the
   number of images written in the file.
 }
 %\references{
